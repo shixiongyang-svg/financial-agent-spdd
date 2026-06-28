@@ -159,7 +159,7 @@ Execute the following steps in order:
 6. **Write `./start` launch script**: Check if `/etc/hosts` has the domain →
    127.0.0.1 mappings. If missing, prompt user for sudo access to add them.
    Then run `docker compose up`.
-7. **Create project config files**: `.env.example`, `README.md` (quickstart, project layout, etc.).
+7. **Create `README.md`** (quickstart, project layout, etc.).
 
 ---
 
@@ -170,7 +170,6 @@ Execute the following steps in order:
 ```text
 financial-agent-spdd_week_00/
 ├── start                                 # CREATE (one-click start script)
-├── .env.example                          # CREATE
 ├── README.md                             # CREATE (skeleton)
 ├── docker-compose.yml                    # CREATE
 ├── codebases/
@@ -208,35 +207,6 @@ financial-agent-spdd_week_00/
 
 - All files under `.spdd_specs/` remain unchanged (except this file).
 - All files under `trainee/` remain unchanged.
-
-### Configuration shape
-
-`.env.example`:
-
-```dotenv
-# Postgres connection
-PG_DSN=postgresql+psycopg://app:app@financial-agent-db:5432/app
-
-# Logging mode: 'json' for production, 'text' for local dev.
-LOG_FORMAT=text
-
-# Ollama (local)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=gemma3:27b
-OLLAMA_OPS_MODEL=qwen3.5:4b
-
-# Embedding model
-EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_DIM=768
-
-# LLM provider
-LLM_PROVIDER=ollama
-
-# OpenRouter (optional)
-# OPENROUTER_API_KEY=
-# OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-# OPENROUTER_MODEL=gpt-4.1-mini
-```
 
 #### Compute paths — pick whichever fits your machine
 
@@ -419,11 +389,9 @@ def test_healthz_returns_ok():
 - API healthz: `http://financial-agent-api.localhost.com/healthz`
 - DB: `localhost:5432`
 
-### Step 7: Create Project Config Files
+### Step 7: Create README
 
-7.1 Create `.env.example` (content per the configuration shape above).
-
-7.2 Create `README.md` skeleton with sections: *Quickstart*, *Project Layout*,
+7.1 Create `README.md` skeleton with sections: *Quickstart*, *Project Layout*,
    *Health Endpoints*.
 
 ### Step 8: Local Verification
@@ -476,8 +444,7 @@ def test_healthz_returns_ok():
 5. **Do not add a standalone vector-store service to `docker-compose.yml`.**
    `pgvector` runs inside the `db` Postgres container.
 6. **Do not add `chroma`, `qdrant`, `weaviate`, or `faiss` to deps.**
-7. **Do not bake secrets into images.** All secrets come from `.env`
-   via `env_file` in compose.
+7. **Do not bake secrets into images.**
 8. **Do not create or modify any file under `data/`.** The starter
    corpus is read-only from this point onward.
 

@@ -133,7 +133,7 @@ API "1" --> "1" Db : PG_DSN
 4. **搭建 PostgreSQL 数据库**：使用 `pgvector/pgvector:pg16` 镜像，服务名 `financial-agent-db`
 5. **编写 Docker Compose**：四个服务 `financial-agent-api`、`financial-agent-ui`、`financial-agent-db`、`financial-agent-nginx`，`api` 依赖 `db`
 6. **编写 `./start` 启动脚本**：检查 `/etc/hosts` 中是否有对应域名 → 127.0.0.1 的映射，没有则提示用户用 sudo 添加；然后 `docker compose up`
-7. **创建项目配置文件**：`.env.example`、`README.md`（快速开始、项目布局等）
+7. **创建 `README.md`**（快速开始、项目布局等）
 
 
 ## 结构
@@ -143,7 +143,6 @@ API "1" --> "1" Db : PG_DSN
 ```text
 financial-agent-spdd_week_00/
 ├── start                                 # 创建（一键启动脚本）
-├── .env.example                          # 创建
 ├── README.md                             # 创建（骨架）
 ├── docker-compose.yml                    # 创建
 ├── codebases/
@@ -182,36 +181,7 @@ financial-agent-spdd_week_00/
 - `.spdd_specs/` 目录下的所有文件保持不变（除本文件外）
 - `trainee/` 目录下的所有文件保持不变
 
-### 配置形态
-
-`.env.example`：
-
-```dotenv
-# Postgres 连接
-PG_DSN=postgresql+psycopg://app:app@financial-agent-db:5432/app
-
-# 日志模式：'json' 用于生产环境，'text' 用于本地开发
-LOG_FORMAT=text
-
-# Ollama（本地）
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=gemma3:27b
-OLLAMA_OPS_MODEL=qwen3.5:4b
-
-# 嵌入模型
-EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_DIM=768
-
-# LLM 提供商
-LLM_PROVIDER=ollama
-
-# OpenRouter（可选）
-# OPENROUTER_API_KEY=
-# OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-# OPENROUTER_MODEL=gpt-4.1-mini
-```
-
-#### 计算路径 — 选择适合你机器的方式
+### 计算路径 — 选择适合你机器的方式
 
 课程大纲是与提供商无关的。没有"正确"的路径；选择能让你的
 笔记本风扇保持安静、浏览器标签保持打开的那个。
@@ -376,11 +346,9 @@ def test_healthz_returns_ok():
 - API healthz: `http://financial-agent-api.localhost.com/healthz`
 - DB: `localhost:5432`
 
-### 步骤 7：创建项目配置文件
+### 步骤 7：创建 README
 
-7.1 创建 `.env.example`（内容见上方配置形态）。
-
-7.2 创建 `README.md` 骨架，包含章节：*快速开始*、*项目布局*、*健康端点*。
+7.1 创建 `README.md` 骨架，包含章节：*快速开始*、*项目布局*、*健康端点*。
 
 ### 步骤 8：本地验证
 
@@ -421,7 +389,7 @@ def test_healthz_returns_ok():
 4. **不得实现 `LLMService` 或 `RetrievalService`。** Task 1 拥有 LLM 抽象；Task 2 拥有检索。
 5. **不得向 `docker-compose.yml` 添加独立的向量存储服务。** `pgvector` 在 `db` Postgres 容器内运行。
 6. **不得向依赖中添加 `chroma`、`qdrant`、`weaviate` 或 `faiss`。**
-7. **不得将密钥写入镜像。** 所有密钥通过 compose 中的 `env_file` 从 `.env` 获取。
+7. **不得将密钥写入镜像。**
 8. **不得创建或修改 `data/` 下的任何文件。** 入门语料库是只读的。
 
 ### 错误处理细节
