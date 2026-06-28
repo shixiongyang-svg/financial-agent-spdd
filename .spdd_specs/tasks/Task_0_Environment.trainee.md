@@ -64,7 +64,6 @@ spends time fighting infrastructure instead of building features.
 | `financial-agent-db` | PostgreSQL 16 + pgvector extension. Uses `pgvector/pgvector:pg16` image. |
 | `financial-agent-nginx` | HTTP reverse proxy, routes domains to corresponding services (ui/api). |
 | `pgvector` | Postgres extension. Must be available in the chosen image; the `pgvector/pgvector:pg16` image is preferred for zero install steps. |
-| `Settings` | Stub class only — declares the env keys, no business logic yet. Concretised in Task 1. |
 
 ### Deployment topology overview
 
@@ -90,7 +89,6 @@ class UI {
 class API {
   +FastAPI app
   +healthz() → 200
-  +Settings settings
 }
 
 class Db {
@@ -183,9 +181,6 @@ financial-agent-spdd_week_00/
 │   │   │   └── financial_agent_api/
 │   │   │       ├── __init__.py           # CREATE
 │   │   │       ├── main.py               # CREATE (FastAPI + /healthz)
-│   │   │       └── core/
-│   │   │           ├── __init__.py       # CREATE
-│   │   │           └── config.py         # CREATE (Settings skeleton)
 │   │   └── tests/
 │   │       ├── __init__.py               # CREATE
 │   │       └── test_health.py            # CREATE
@@ -314,45 +309,9 @@ dev = [
 ]
 ```
 
-1.3 Create `src/financial_agent_api/__init__.py`,
-`src/financial_agent_api/core/__init__.py` (empty files).
+1.3 Create `src/financial_agent_api/__init__.py` (empty file).
 
-1.4 Write `src/financial_agent_api/core/config.py` skeleton:
-
-```python
-"""Application configuration (skeleton — concretised in Task 1)."""
-
-from typing import Literal
-from pydantic import model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    pg_dsn: str
-    llm_provider: Literal["ollama", "openrouter"] = "ollama"
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "gemma3:27b"
-    ollama_ops_model: str = "qwen3.5:4b"
-    embedding_model: str = "nomic-embed-text"
-    embedding_dim: int = 768
-    openrouter_api_key: str | None = None
-    openrouter_model: str = "gpt-4.1-mini"
-    log_format: Literal["json", "text"] = "text"
-
-    @model_validator(mode="after")
-    def _require_openrouter_key(self) -> "Settings":
-        if self.llm_provider == "openrouter" and not self.openrouter_api_key:
-            raise ValueError("OPENROUTER_API_KEY required when LLM_PROVIDER=openrouter")
-        return self
-
-
-def get_settings() -> Settings:
-    return Settings()  # Task 1 will replace with @lru_cache
-```
-
-1.5 Write `src/financial_agent_api/main.py`:
+1.4 Write `src/financial_agent_api/main.py`:
 
 ```python
 """Financial Helpdesk Agent — FastAPI application entry point."""
@@ -367,9 +326,9 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 ```
 
-1.6 Write `tests/__init__.py` (empty file).
+1.5 Write `tests/__init__.py` (empty file).
 
-1.7 Write `tests/test_health.py`:
+1.6 Write `tests/test_health.py`:
 
 ```python
 """Tests for the /healthz endpoint."""
@@ -386,13 +345,13 @@ def test_healthz_returns_ok():
     assert response.json() == {"status": "ok"}
 ```
 
-1.8 Run `uv lock` to generate `uv.lock`, then `uv run pytest tests/` to verify
-tests pass.
+1.7 Run `uv lock` to generate `uv.lock`, then `uv run pytest tests/` to verify
+   tests pass.
 
 ### Step 2: Scaffold UI Project (`codebases/financial-agent-ui/`)
 
 2.1 Create `package.json`, using a simple static HTML page (no heavy framework,
-in keeping with the "minimal surface area" principle).
+   in keeping with the "minimal surface area" principle).
 
 2.2 Create `public/index.html` — placeholder page containing:
 - Project title "Financial Helpdesk Agent"
@@ -401,7 +360,7 @@ in keeping with the "minimal surface area" principle).
   and displaying the response.
 
 2.3 Create `src/App.js` (if using a framework like React), otherwise inline JS
-directly in `index.html`.
+   directly in `index.html`.
 
 2.4 The UI project only needs to serve `/` returning this page via an HTTP server.
 
@@ -410,17 +369,17 @@ directly in `index.html`.
 3.1 Create `nginx.conf` (main configuration).
 
 3.2 Create `financial-agent-api.localhost.com.conf` — reverse proxy to
-`financial-agent-api:8000`.
+   `financial-agent-api:8000`.
 
 3.3 Create `financial-agent-ui.localhost.com.conf` — reverse proxy to the
-`financial-agent-ui` service port.
+   `financial-agent-ui` service port.
 
 3.4 HTTP only for now (port 80).
 
 ### Step 4: Write Dockerfiles for Each Service
 
 4.1 `support/financial-agent-api/Dockerfile` — single-stage build, Python 3.11
-slim base image:
+   slim base image:
 - Install `uv`
 - Copy `pyproject.toml` and `uv.lock` first, install dependencies
 - Then copy `src/`
@@ -428,18 +387,18 @@ slim base image:
 - CMD: `["uv", "run", "uvicorn", "financial_agent_api.main:app", "--host", "0.0.0.0", "--port", "8000"]`
 
 4.2 `support/financial-agent-ui/Dockerfile` — based on nginx or node image,
-serving the static page.
+   serving the static page.
 
 ### Step 5: Write `docker-compose.yml`
 
 5.1 Four services: `financial-agent-api`, `financial-agent-ui`,
-`financial-agent-db`, `financial-agent-nginx`.
+   `financial-agent-db`, `financial-agent-nginx`.
 
 5.2 `financial-agent-db` uses `pgvector/pgvector:pg16` image, health check
-using `pg_isready`.
+   using `pg_isready`.
 
 5.3 `financial-agent-api` depends on `financial-agent-db`
-(`condition: service_healthy`).
+   (`condition: service_healthy`).
 
 5.4 All services join the same Docker network, Nginx exposes port 80.
 
@@ -465,23 +424,23 @@ using `pg_isready`.
 7.1 Create `.env.example` (content per the configuration shape above).
 
 7.2 Create `README.md` skeleton with sections: *Quickstart*, *Project Layout*,
-*Health Endpoints*.
+   *Health Endpoints*.
 
 ### Step 8: Local Verification
 
 8.1 Run `./start` to confirm all services start successfully.
 
 8.2 Run `curl -fsS http://financial-agent-api.localhost.com/healthz` expecting
-`{"status":"ok"}`.
+   `{"status":"ok"}`.
 
 8.3 Browser visit `http://financial-agent-ui.localhost.com` to confirm the
-placeholder page displays correctly and the API request succeeds.
+   placeholder page displays correctly and the API request succeeds.
 
 8.4 Enter `codebases/financial-agent-api/`, run `uv run pytest tests/` to confirm
-tests pass.
+   tests pass.
 
 8.5 Connect to the database, execute `CREATE EXTENSION IF NOT EXISTS vector;` to
-confirm pgvector is installed.
+   confirm pgvector is installed.
 
 ---
 
@@ -492,8 +451,6 @@ confirm pgvector is installed.
   `__init__.py` even if empty. This avoids implicit namespace packages
   and makes `mypy` happy.
 - Python files start with a one-line module docstring describing intent.
-- Configuration access is always through `get_settings()`; never read
-  `os.environ` directly outside `config.py`.
 - Imports order: standard library, third-party, local. One blank line
   between groups.
 - Line length: 100 characters; enforced by `ruff` defaults.

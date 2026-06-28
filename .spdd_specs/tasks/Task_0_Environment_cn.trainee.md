@@ -58,7 +58,6 @@ Task 都会花时间在基础设施上折腾，而不是构建功能。
 | `financial-agent-db`    | PostgreSQL 16 + pgvector 扩展。使用 `pgvector/pgvector:pg16` 镜像。      |
 | `financial-agent-nginx` | HTTP 反向代理，将域名路由到对应服务（ui/api）。                                    |
 | `pgvector`              | Postgres 扩展。必须在所选镜像中可用；首选 `pgvector/pgvector:pg16` 镜像，无需安装步骤。    |
-| `Settings`              | 仅做桩类 — 声明环境变量键，暂时无业务逻辑。在 Task 1 中具体实现。                           |
 
 ### 部署拓扑概览
 
@@ -83,7 +82,6 @@ class UI {
 class API {
   +FastAPI app
   +healthz() → 200
-  +Settings settings
 }
 
 class Db {
@@ -156,9 +154,6 @@ financial-agent-spdd_week_00/
 │   │   │   └── financial_agent_api/
 │   │   │       ├── __init__.py           # 创建
 │   │   │       ├── main.py               # 创建（FastAPI + /healthz）
-│   │   │       └── core/
-│   │   │           ├── __init__.py       # 创建
-│   │   │           └── config.py         # 创建（Settings 骨架）
 │   │   └── tests/
 │   │       ├── __init__.py               # 创建
 │   │       └── test_health.py            # 创建
@@ -282,44 +277,9 @@ dev = [
 ]
 ```
 
-1.3 创建 `src/financial_agent_api/__init__.py`、`src/financial_agent_api/core/__init__.py`（空文件）。
+1.3 创建 `src/financial_agent_api/__init__.py`（空文件）。
 
-1.4 编写 `src/financial_agent_api/core/config.py` 骨架：
-
-```python
-"""应用配置（骨架 — Task 1 中具体实现）。"""
-
-from typing import Literal
-from pydantic import model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    pg_dsn: str
-    llm_provider: Literal["ollama", "openrouter"] = "ollama"
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "gemma3:27b"
-    ollama_ops_model: str = "qwen3.5:4b"
-    embedding_model: str = "nomic-embed-text"
-    embedding_dim: int = 768
-    openrouter_api_key: str | None = None
-    openrouter_model: str = "gpt-4.1-mini"
-    log_format: Literal["json", "text"] = "text"
-
-    @model_validator(mode="after")
-    def _require_openrouter_key(self) -> "Settings":
-        if self.llm_provider == "openrouter" and not self.openrouter_api_key:
-            raise ValueError("当 LLM_PROVIDER=openrouter 时需要 OPENROUTER_API_KEY")
-        return self
-
-
-def get_settings() -> Settings:
-    return Settings()  # Task 1 将替换为 @lru_cache
-```
-
-1.5 编写 `src/financial_agent_api/main.py`：
+1.4 编写 `src/financial_agent_api/main.py`：
 
 ```python
 """Financial Helpdesk Agent — FastAPI 应用入口。"""
@@ -334,9 +294,9 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 ```
 
-1.6 编写 `tests/__init__.py`（空文件）。
+1.5 编写 `tests/__init__.py`（空文件）。
 
-1.7 编写 `tests/test_health.py`：
+1.6 编写 `tests/test_health.py`：
 
 ```python
 """测试 /healthz 端点。"""
@@ -353,7 +313,7 @@ def test_healthz_returns_ok():
     assert response.json() == {"status": "ok"}
 ```
 
-1.8 执行 `uv lock` 生成 `uv.lock`，运行 `uv run pytest tests/` 验证测试通过。
+1.7 执行 `uv lock` 生成 `uv.lock`，运行 `uv run pytest tests/` 验证测试通过。
 
 ### 步骤 2：搭建 UI 项目 (`codebases/financial-agent-ui/`)
 
@@ -442,8 +402,6 @@ def test_healthz_returns_ok():
 - 文件夹打包：`src/` 和 `tests/` 下的每个目录都有一个 `__init__.py`，
   即使是空的。这避免了隐式命名空间包，并使 `mypy` 满意。
 - Python 文件以一行描述意图的模块文档字符串开头。
-- 配置访问始终通过 `get_settings()` 进行；绝不在 `config.py` 外部
-  直接读取 `os.environ`。
 - 导入顺序：标准库、第三方、本地。各组之间空一行。
 - 行长度：100 个字符；由 `ruff` 默认值强制执行。
 
