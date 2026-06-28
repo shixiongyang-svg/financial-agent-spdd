@@ -64,7 +64,6 @@ spends time fighting infrastructure instead of building features.
 | `financial-agent-db` | PostgreSQL 16 + pgvector extension. Uses `pgvector/pgvector:pg16` image. |
 | `financial-agent-nginx` | HTTP reverse proxy, routes domains to corresponding services (ui/api). |
 | `pgvector` | Postgres extension. Must be available in the chosen image; the `pgvector/pgvector:pg16` image is preferred for zero install steps. |
-| `Settings` | Stub class only — declares the env keys, no business logic yet. Concretised in Task 1. |
 
 ### Deployment topology overview
 
@@ -90,7 +89,6 @@ class UI {
 class API {
   +FastAPI app
   +healthz() → 200
-  +Settings settings
 }
 
 class Db {
@@ -183,9 +181,6 @@ financial-agent-spdd_week_00/
 │   │   │   └── financial_agent_api/
 │   │   │       ├── __init__.py           # CREATE
 │   │   │       ├── main.py               # CREATE (FastAPI + /healthz)
-│   │   │       └── core/
-│   │   │           ├── __init__.py       # CREATE
-│   │   │           └── config.py         # CREATE (Settings skeleton)
 │   │   └── tests/
 │   │       ├── __init__.py               # CREATE
 │   │       └── test_health.py            # CREATE
@@ -314,45 +309,9 @@ dev = [
 ]
 ```
 
-1.3 Create `src/financial_agent_api/__init__.py`,
-   `src/financial_agent_api/core/__init__.py` (empty files).
+1.3 Create `src/financial_agent_api/__init__.py` (empty file).
 
-1.4 Write `src/financial_agent_api/core/config.py` skeleton:
-
-```python
-"""Application configuration (skeleton — concretised in Task 1)."""
-
-from typing import Literal
-from pydantic import model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    pg_dsn: str
-    llm_provider: Literal["ollama", "openrouter"] = "ollama"
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "gemma3:27b"
-    ollama_ops_model: str = "qwen3.5:4b"
-    embedding_model: str = "nomic-embed-text"
-    embedding_dim: int = 768
-    openrouter_api_key: str | None = None
-    openrouter_model: str = "gpt-4.1-mini"
-    log_format: Literal["json", "text"] = "text"
-
-    @model_validator(mode="after")
-    def _require_openrouter_key(self) -> "Settings":
-        if self.llm_provider == "openrouter" and not self.openrouter_api_key:
-            raise ValueError("OPENROUTER_API_KEY required when LLM_PROVIDER=openrouter")
-        return self
-
-
-def get_settings() -> Settings:
-    return Settings()  # Task 1 will replace with @lru_cache
-```
-
-1.5 Write `src/financial_agent_api/main.py`:
+1.4 Write `src/financial_agent_api/main.py`:
 
 ```python
 """Financial Helpdesk Agent — FastAPI application entry point."""
@@ -367,9 +326,9 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 ```
 
-1.6 Write `tests/__init__.py` (empty file).
+1.5 Write `tests/__init__.py` (empty file).
 
-1.7 Write `tests/test_health.py`:
+1.6 Write `tests/test_health.py`:
 
 ```python
 """Tests for the /healthz endpoint."""
@@ -386,7 +345,7 @@ def test_healthz_returns_ok():
     assert response.json() == {"status": "ok"}
 ```
 
-1.8 Run `uv lock` to generate `uv.lock`, then `uv run pytest tests/` to verify
+1.7 Run `uv lock` to generate `uv.lock`, then `uv run pytest tests/` to verify
    tests pass.
 
 ### Step 2: Scaffold UI Project (`codebases/financial-agent-ui/`)
@@ -492,8 +451,6 @@ def test_healthz_returns_ok():
   `__init__.py` even if empty. This avoids implicit namespace packages
   and makes `mypy` happy.
 - Python files start with a one-line module docstring describing intent.
-- Configuration access is always through `get_settings()`; never read
-  `os.environ` directly outside `config.py`.
 - Imports order: standard library, third-party, local. One blank line
   between groups.
 - Line length: 100 characters; enforced by `ruff` defaults.
