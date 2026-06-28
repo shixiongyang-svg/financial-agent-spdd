@@ -58,6 +58,7 @@ Task 都会花时间在基础设施上折腾，而不是构建功能。
 | `financial-agent-db`    | PostgreSQL 16 + pgvector 扩展。使用 `pgvector/pgvector:pg16` 镜像。      |
 | `financial-agent-nginx` | HTTP 反向代理，将域名路由到对应服务（ui/api）。                                    |
 | `pgvector`              | Postgres 扩展。必须在所选镜像中可用；首选 `pgvector/pgvector:pg16` 镜像，无需安装步骤。    |
+| `Settings`              | 仅做桩类 — 声明环境变量键，暂时无业务逻辑。在 Task 1 中具体实现。                           |
 
 ### 部署拓扑概览
 
@@ -82,6 +83,7 @@ class UI {
 class API {
   +FastAPI app
   +healthz() → 200
+  +Settings settings
 }
 
 class Db {
@@ -133,7 +135,7 @@ API "1" --> "1" Db : PG_DSN
 4. **搭建 PostgreSQL 数据库**：使用 `pgvector/pgvector:pg16` 镜像，服务名 `financial-agent-db`
 5. **编写 Docker Compose**：四个服务 `financial-agent-api`、`financial-agent-ui`、`financial-agent-db`、`financial-agent-nginx`，`api` 依赖 `db`
 6. **编写 `./start` 启动脚本**：检查 `/etc/hosts` 中是否有对应域名 → 127.0.0.1 的映射，没有则提示用户用 sudo 添加；然后 `docker compose up`
-7. **创建 `README.md`**（快速开始、项目布局等）
+7. **创建项目配置文件**：`.env.example`、`README.md`（快速开始、项目布局等）
 
 
 ## 结构
@@ -143,6 +145,7 @@ API "1" --> "1" Db : PG_DSN
 ```text
 financial-agent-spdd_week_00/
 ├── start                                 # 创建（一键启动脚本）
+├── .env.example                          # 创建
 ├── README.md                             # 创建（骨架）
 ├── docker-compose.yml                    # 创建
 ├── codebases/
@@ -153,6 +156,9 @@ financial-agent-spdd_week_00/
 │   │   │   └── financial_agent_api/
 │   │   │       ├── __init__.py           # 创建
 │   │   │       ├── main.py               # 创建（FastAPI + /healthz）
+│   │   │       └── core/
+│   │   │           ├── __init__.py       # 创建
+│   │   │           └── config.py         # 创建（Settings 骨架）
 │   │   └── tests/
 │   │       ├── __init__.py               # 创建
 │   │       └── test_health.py            # 创建
@@ -181,7 +187,36 @@ financial-agent-spdd_week_00/
 - `.spdd_specs/` 目录下的所有文件保持不变（除本文件外）
 - `trainee/` 目录下的所有文件保持不变
 
-### 计算路径 — 选择适合你机器的方式
+### 配置形态
+
+`.env.example`：
+
+```dotenv
+# Postgres 连接
+PG_DSN=postgresql+psycopg://app:app@financial-agent-db:5432/app
+
+# 日志模式：'json' 用于生产环境，'text' 用于本地开发
+LOG_FORMAT=text
+
+# Ollama（本地）
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_CHAT_MODEL=gemma3:27b
+OLLAMA_OPS_MODEL=qwen3.5:4b
+
+# 嵌入模型
+EMBEDDING_MODEL=nomic-embed-text
+EMBEDDING_DIM=768
+
+# LLM 提供商
+LLM_PROVIDER=ollama
+
+# OpenRouter（可选）
+# OPENROUTER_API_KEY=
+# OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+# OPENROUTER_MODEL=gpt-4.1-mini
+```
+
+#### 计算路径 — 选择适合你机器的方式
 
 课程大纲是与提供商无关的。没有"正确"的路径；选择能让你的
 笔记本风扇保持安静、浏览器标签保持打开的那个。
@@ -247,9 +282,44 @@ dev = [
 ]
 ```
 
-1.3 创建 `src/financial_agent_api/__init__.py`（空文件）。
+1.3 创建 `src/financial_agent_api/__init__.py`、`src/financial_agent_api/core/__init__.py`（空文件）。
 
-1.4 编写 `src/financial_agent_api/main.py`：
+1.4 编写 `src/financial_agent_api/core/config.py` 骨架：
+
+```python
+"""应用配置（骨架 — Task 1 中具体实现）。"""
+
+from typing import Literal
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    pg_dsn: str
+    llm_provider: Literal["ollama", "openrouter"] = "ollama"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_chat_model: str = "gemma3:27b"
+    ollama_ops_model: str = "qwen3.5:4b"
+    embedding_model: str = "nomic-embed-text"
+    embedding_dim: int = 768
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "gpt-4.1-mini"
+    log_format: Literal["json", "text"] = "text"
+
+    @model_validator(mode="after")
+    def _require_openrouter_key(self) -> "Settings":
+        if self.llm_provider == "openrouter" and not self.openrouter_api_key:
+            raise ValueError("当 LLM_PROVIDER=openrouter 时需要 OPENROUTER_API_KEY")
+        return self
+
+
+def get_settings() -> Settings:
+    return Settings()  # Task 1 将替换为 @lru_cache
+```
+
+1.5 编写 `src/financial_agent_api/main.py`：
 
 ```python
 """Financial Helpdesk Agent — FastAPI 应用入口。"""
@@ -264,9 +334,9 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 ```
 
-1.5 编写 `tests/__init__.py`（空文件）。
+1.6 编写 `tests/__init__.py`（空文件）。
 
-1.6 编写 `tests/test_health.py`：
+1.7 编写 `tests/test_health.py`：
 
 ```python
 """测试 /healthz 端点。"""
@@ -283,7 +353,7 @@ def test_healthz_returns_ok():
     assert response.json() == {"status": "ok"}
 ```
 
-1.7 执行 `uv lock` 生成 `uv.lock`，运行 `uv run pytest tests/` 验证测试通过。
+1.8 执行 `uv lock` 生成 `uv.lock`，运行 `uv run pytest tests/` 验证测试通过。
 
 ### 步骤 2：搭建 UI 项目 (`codebases/financial-agent-ui/`)
 
@@ -346,9 +416,11 @@ def test_healthz_returns_ok():
 - API healthz: `http://financial-agent-api.localhost.com/healthz`
 - DB: `localhost:5432`
 
-### 步骤 7：创建 README
+### 步骤 7：创建项目配置文件
 
-7.1 创建 `README.md` 骨架，包含章节：*快速开始*、*项目布局*、*健康端点*。
+7.1 创建 `.env.example`（内容见上方配置形态）。
+
+7.2 创建 `README.md` 骨架，包含章节：*快速开始*、*项目布局*、*健康端点*。
 
 ### 步骤 8：本地验证
 
@@ -370,6 +442,8 @@ def test_healthz_returns_ok():
 - 文件夹打包：`src/` 和 `tests/` 下的每个目录都有一个 `__init__.py`，
   即使是空的。这避免了隐式命名空间包，并使 `mypy` 满意。
 - Python 文件以一行描述意图的模块文档字符串开头。
+- 配置访问始终通过 `get_settings()` 进行；绝不在 `config.py` 外部
+  直接读取 `os.environ`。
 - 导入顺序：标准库、第三方、本地。各组之间空一行。
 - 行长度：100 个字符；由 `ruff` 默认值强制执行。
 
@@ -389,7 +463,7 @@ def test_healthz_returns_ok():
 4. **不得实现 `LLMService` 或 `RetrievalService`。** Task 1 拥有 LLM 抽象；Task 2 拥有检索。
 5. **不得向 `docker-compose.yml` 添加独立的向量存储服务。** `pgvector` 在 `db` Postgres 容器内运行。
 6. **不得向依赖中添加 `chroma`、`qdrant`、`weaviate` 或 `faiss`。**
-7. **不得将密钥写入镜像。**
+7. **不得将密钥写入镜像。** 所有密钥通过 compose 中的 `env_file` 从 `.env` 获取。
 8. **不得创建或修改 `data/` 下的任何文件。** 入门语料库是只读的。
 
 ### 错误处理细节
@@ -413,7 +487,7 @@ curl -fsS http://financial-agent-api.localhost.com/healthz   # 期望返回 {"st
 # 浏览器打开 http://financial-agent-ui.localhost.com
 
 # 4. API 项目测试
-docker compose exec financial-agent-api uv run pytest tests/ -v
+cd codebases/financial-agent-api && uv run pytest tests/ -v
 
 # 5. 数据库 pgvector 扩展验证
 # 使用 PG_DSN 连接后执行：
