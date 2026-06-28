@@ -1,0 +1,11 @@
+{
+  "name": "financial-agent-ui",
+  "version": "0.0.0",
+  "description": "Financial Helpdesk Agent — UI placeholder",
+  "scripts": {
+    "start": "serve public -l 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.0"
+  }
+}

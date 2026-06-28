@@ -1,0 +1,75 @@
+services:
+  financial-agent-api:
+    container_name: financial-agent-api
+    build:
+      context: ./codebases/financial-agent-api
+      dockerfile: ../../support/financial-agent-api/Dockerfile
+    depends_on:
+      financial-agent-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - financial-agent-network
+
+  financial-agent-db:
+    container_name: financial-agent-db
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - financial-agent-network
+
+  financial-agent-ui:
+    container_name: financial-agent-ui
+    build:
+      context: ./codebases/financial-agent-ui
+      dockerfile: ../../support/financial-agent-ui/Dockerfile
+    depends_on:
+      financial-agent-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - financial-agent-network
+
+  financial-agent-nginx:
+    container_name: financial-agent-nginx
+    image: nginx:stable-alpine
+    volumes:
+      - ./support/financial-agent-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./support/financial-agent-nginx/financial-agent-api.localhost.com.conf:/etc/nginx/conf.d/financial-agent-api.localhost.com.conf:ro
+      - ./support/financial-agent-nginx/financial-agent-ui.localhost.com.conf:/etc/nginx/conf.d/financial-agent-ui.localhost.com.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      financial-agent-api:
+        condition: service_healthy
+      financial-agent-ui:
+        condition: service_healthy
+    networks:
+      - financial-agent-network
+
+volumes:
+  db_data:
+
+networks:
+  financial-agent-network:
+    driver: bridge

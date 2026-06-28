@@ -312,7 +312,7 @@ a destructive `DROP TABLE doc_embeddings; CREATE TABLE …` operation.
 ### Strict technology stack
 
 - **Runtime:** Python 3.11+, type-hinted, async-first where I/O dominates.
-- **Dependency manager:** Poetry (or `uv`). Pick once, do not mix.
+- **Dependency manager:** `uv`. This project uniformly uses `uv` for Python project management.
 - **HTTP server:** FastAPI + `uvicorn[standard]`.
 - **Agent orchestration:** LangGraph.
 - **HTTP client (outbound):** `httpx`.
@@ -332,7 +332,7 @@ a destructive `DROP TABLE doc_embeddings; CREATE TABLE …` operation.
 ### Repository layout (target end state)
 
 ```text
-financial-agent/
+financial-agent-spdd/
 ├── .spdd_specs/                          # ← this folder
 │   ├── 0_Root_Architecture.md            # destination (mentor-only until Week 8)
 │   ├── 0_Root_Architecture.trainee.md    # ← you are here (the constitution you start with)
@@ -356,31 +356,61 @@ financial-agent/
 │       ├── Task_7_Safety.md                   # destination
 │       ├── Task_8_Extensions.trainee.md       # ← Week 8 (optional)
 │       └── Task_8_Extensions.md               # destination
-├── app/
-│   ├── core/
-│   │   ├── config.py
-│   │   ├── state.py
-│   │   ├── graph.py
-│   │   ├── prompt_service.py
-│   │   ├── safety_policy.py
-│   │   └── prompts/
-│   │       ├── doc_summary.j2
-│   │       ├── scenario_extraction.j2
-│   │       ├── next_steps.j2
-│   │       └── safety_classification.j2
-│   ├── services/
-│   │   ├── llm_client.py
-│   │   ├── llm_service.py
-│   │   ├── retrieval_service.py
-│   │   └── feedback_service.py
-│   ├── tools/
-│   │   ├── retrieve_docs_tool.py
-│   │   ├── retrieve_structured_tool.py
-│   │   ├── summarise_tool.py
-│   │   ├── scenario_extraction_tool.py
-│   │   └── next_steps_tool.py
-│   └── api/
-│       └── main.py                       # FastAPI app
+├── start                                 # one-click start script
+├── .env.example                          # environment variable example
+├── README.md                             # project README
+├── docker-compose.yml                    # Docker Compose orchestration
+├── codebases/
+│   ├── financial-agent-api/              # API project (FastAPI + LangGraph)
+│   │   ├── pyproject.toml                # uv project config
+│   │   ├── uv.lock                       # dependency lock file
+│   │   ├── src/
+│   │   │   └── financial_agent_api/
+│   │   │       ├── __init__.py
+│   │   │       ├── main.py               # FastAPI app entry point
+│   │   │       └── core/
+│   │   │           ├── __init__.py
+│   │   │           ├── config.py
+│   │   │           ├── state.py
+│   │   │           ├── graph.py
+│   │   │           ├── prompt_service.py
+│   │   │           ├── safety_policy.py
+│   │   │           └── prompts/
+│   │   │               ├── doc_summary.j2
+│   │   │               ├── scenario_extraction.j2
+│   │   │               ├── next_steps.j2
+│   │   │               └── safety_classification.j2
+│   │   ├── services/
+│   │   │   ├── llm_client.py
+│   │   │   ├── llm_service.py
+│   │   │   ├── retrieval_service.py
+│   │   │   └── feedback_service.py
+│   │   ├── tools/
+│   │   │   ├── retrieve_docs_tool.py
+│   │   │   ├── retrieve_structured_tool.py
+│   │   │   ├── summarise_tool.py
+│   │   │   ├── scenario_extraction_tool.py
+│   │   │   └── next_steps_tool.py
+│   │   └── tests/
+│   │       ├── test_config.py
+│   │       ├── test_health.py
+│   │       ├── test_llm_service.py
+│   │       ├── test_retrieval.py
+│   │       ├── test_tools.py
+│   │       ├── test_graph.py
+│   │       ├── test_safety_policy.py
+│   │       └── test_feedback.py
+│   └── financial-agent-ui/               # UI project (Streamlit / static page)
+│       └── ...
+├── support/                              # Docker and infrastructure support files
+│   ├── financial-agent-api/
+│   │   └── Dockerfile
+│   ├── financial-agent-ui/
+│   │   └── Dockerfile
+│   └── financial-agent-nginx/
+│       ├── nginx.conf
+│       ├── financial-agent-api.localhost.com.conf
+│       └── financial-agent-ui.localhost.com.conf
 ├── data/                                 # ← already populated
 │   ├── raw_docs/                         # 3 cleaned CFPB Q&A .txt files
 │   └── samples/                          # complaints_sample.csv
@@ -396,24 +426,10 @@ financial-agent/
 │       ├── report.py
 │       ├── export_feedback_to_scenarios.py
 │       └── test_scenarios.yaml
-├── ui/
-│   └── app.py                            # Streamlit
-├── infra/
-│   ├── docker/
-│   │   └── Dockerfile.app
-│   └── docker-compose.yml
-├── tests/
-│   ├── test_config.py
-│   ├── test_llm_service.py
-│   ├── test_retrieval.py
-│   ├── test_tools.py
-│   ├── test_graph.py
-│   ├── test_safety_policy.py
-│   └── test_feedback.py
+├── trainee/                              # trainee guides
 ├── .github/workflows/
 │   └── eval.yml
-├── pyproject.toml
-└── README.md
+└── .gitignore
 ```
 
 ### Existing artifacts (already on disk)
@@ -429,26 +445,70 @@ or moved** by any task:
 - `data/raw_docs/credit_card_fees.txt` — 394 words, 2 CFPB Q&A sections.
 - `data/raw_docs/mortgage_servicing_policy.txt` — 554 words, 2 CFPB
   Q&A sections.
-- `pyproject.toml` (minimal `httpx`-only declaration) — the first task
-  expands this with the full project dependency set.
 - `.gitignore`, `data_pipelines/__init__.py`, and the two ingest
   packages.
+- `trainee/` directory with trainee guide files.
 
 ### docker-compose service shape
 
 ```yaml
 services:
-  app:        # FastAPI + LangGraph
-    depends_on: [db]
-    ports: ["8000:8000"]
-  db:         # PostgreSQL + pgvector
-    image: pgvector/pgvector:pg16  # or equivalent
-    volumes: [db_data:/var/lib/postgresql/data]
-  ui:         # Streamlit (added with the UI task)
-    depends_on: [app]
-    ports: ["8501:8501"]
+  financial-agent-api:        # FastAPI + LangGraph
+    build:
+      context: ./codebases/financial-agent-api
+      dockerfile: ../../support/financial-agent-api/Dockerfile
+    depends_on:
+      financial-agent-db:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - financial-agent-network
+
+  financial-agent-db:         # PostgreSQL + pgvector
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - financial-agent-network
+
+  financial-agent-ui:         # UI service (placeholder page → Streamlit)
+    build:
+      context: ./codebases/financial-agent-ui
+      dockerfile: ../../support/financial-agent-ui/Dockerfile
+    depends_on:
+      - financial-agent-api
+    networks:
+      - financial-agent-network
+
+  financial-agent-nginx:      # HTTP reverse proxy
+    image: nginx:stable-alpine
+    volumes:
+      - ./support/financial-agent-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./support/financial-agent-nginx/financial-agent-api.localhost.com.conf:/etc/nginx/conf.d/financial-agent-api.localhost.com.conf:ro
+      - ./support/financial-agent-nginx/financial-agent-ui.localhost.com.conf:/etc/nginx/conf.d/financial-agent-ui.localhost.com.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - financial-agent-api
+      - financial-agent-ui
+    networks:
+      - financial-agent-network
+
 volumes:
   db_data:
+
+networks:
+  financial-agent-network:
+    driver: bridge
 ```
 
 ---
@@ -484,9 +544,9 @@ it also amends this Constitution** in the same commit.
 - Constructor-based dependency injection only. No global singletons or
   module-level factories that hide construction. `LLMService`,
   `RetrievalService`, `FeedbackService` are constructed once in
-  `app/api/main.py` and threaded through to LangGraph nodes via a
+  `codebases/financial-agent-api/src/financial_agent_api/main.py` and threaded through to LangGraph nodes via a
   `ServicesContainer`.
-- All new functions are type-hinted. `mypy --strict` passes on `app/`.
+- All new functions are type-hinted. `mypy --strict` passes on `codebases/financial-agent-api/src/`.
 - Async by default for I/O code paths. Sync helpers are allowed only
   when there is no I/O involved.
 - Pydantic v2 models for all DTOs (request bodies, response bodies,

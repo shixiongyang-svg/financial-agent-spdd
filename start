@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#
+# Financial Helpdesk Agent — One-click startup script.
+# Ensures /etc/hosts has the required domain entries, then launches
+# all services via Docker Compose.
+#
+set -euo pipefail
+
+HOSTS_FILE="/etc/hosts"
+HOSTS_ENTRIES=(
+    "127.0.0.1 financial-agent-ui.localhost.com"
+    "127.0.0.1 financial-agent-api.localhost.com"
+)
+
+missing_entries=()
+for entry in "${HOSTS_ENTRIES[@]}"; do
+    if ! grep -qF "$entry" "$HOSTS_FILE" 2>/dev/null; then
+        missing_entries+=("$entry")
+    fi
+done
+
+if [ ${#missing_entries[@]} -gt 0 ]; then
+    echo "The following /etc/hosts entries are missing and required for local development:"
+    for entry in "${missing_entries[@]}"; do
+        echo "  $entry"
+    done
+    echo ""
+    echo "This script needs sudo access to add them."
+    echo "Adding entries to /etc/hosts..."
+
+    for entry in "${missing_entries[@]}"; do
+        if ! echo "$entry" | sudo tee -a "$HOSTS_FILE" > /dev/null 2>&1; then
+            echo "ERROR: Failed to add hosts entry: $entry" >&2
+            echo "Please add the following entries to /etc/hosts manually:" >&2
+            for e in "${missing_entries[@]}"; do
+                echo "  $e" >&2
+            done
+            exit 1
+        fi
+    done
+
+    echo "Hosts entries added successfully."
+    echo ""
+fi
+
+echo "Starting Financial Helpdesk Agent services..."
+docker compose up --build -d
+
+echo ""
+echo "============================================"
+echo "  Services started (Docker manages health)."
+echo "============================================"
+echo ""
+echo "  UI:  http://financial-agent-ui.localhost.com"
+echo "  API: http://financial-agent-api.localhost.com/healthz"
+echo "  DB:  localhost:5432"

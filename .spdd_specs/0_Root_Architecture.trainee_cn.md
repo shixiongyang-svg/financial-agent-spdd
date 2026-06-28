@@ -295,7 +295,7 @@ pgvector 列类型是不可变的，因此切换是一个破坏性的
 ### 严格技术栈
 
 - **运行时：** Python 3.11+，带类型提示，I/O 密集路径 async-first。
-- **依赖管理器：** Poetry（或 `uv`）。选择一次，不要混用。
+- **依赖管理器：** `uv`。本项目统一使用 `uv` 进行 Python 项目管理。
 - **HTTP 服务器：** FastAPI + `uvicorn[standard]`。
 - **Agent 编排：** LangGraph。
 - **HTTP 客户端（出站）：** `httpx`。
@@ -313,7 +313,7 @@ pgvector 列类型是不可变的，因此切换是一个破坏性的
 ### 仓库布局（目标终态）
 
 ```text
-financial-agent/
+financial-agent-spdd/
 ├── .spdd_specs/                          # ← 本文件夹
 │   ├── 0_Root_Architecture.md            # 目标版本（导师专用，第 8 周前不可见）
 │   ├── 0_Root_Architecture.trainee.md    # ← 你在这里（你起步所用的章程）
@@ -337,31 +337,61 @@ financial-agent/
 │       ├── Task_7_Safety.md                   # 目标版本
 │       ├── Task_8_Extensions.trainee.md       # ← 第 8 周（可选）
 │       └── Task_8_Extensions.md               # 目标版本
-├── app/
-│   ├── core/
-│   │   ├── config.py
-│   │   ├── state.py
-│   │   ├── graph.py
-│   │   ├── prompt_service.py
-│   │   ├── safety_policy.py
-│   │   └── prompts/
-│   │       ├── doc_summary.j2
-│   │       ├── scenario_extraction.j2
-│   │       ├── next_steps.j2
-│   │       └── safety_classification.j2
-│   ├── services/
-│   │   ├── llm_client.py
-│   │   ├── llm_service.py
-│   │   ├── retrieval_service.py
-│   │   └── feedback_service.py
-│   ├── tools/
-│   │   ├── retrieve_docs_tool.py
-│   │   ├── retrieve_structured_tool.py
-│   │   ├── summarise_tool.py
-│   │   ├── scenario_extraction_tool.py
-│   │   └── next_steps_tool.py
-│   └── api/
-│       └── main.py                       # FastAPI 应用
+├── start                                 # 一键启动脚本
+├── .env.example                          # 环境变量示例
+├── README.md                             # 项目 README
+├── docker-compose.yml                    # Docker Compose 编排
+├── codebases/
+│   ├── financial-agent-api/              # API 项目（FastAPI + LangGraph）
+│   │   ├── pyproject.toml                # uv 项目配置
+│   │   ├── uv.lock                       # 依赖锁文件
+│   │   ├── src/
+│   │   │   └── financial_agent_api/
+│   │   │       ├── __init__.py
+│   │   │       ├── main.py               # FastAPI 应用入口
+│   │   │       └── core/
+│   │   │           ├── __init__.py
+│   │   │           ├── config.py
+│   │   │           ├── state.py
+│   │   │           ├── graph.py
+│   │   │           ├── prompt_service.py
+│   │   │           ├── safety_policy.py
+│   │   │           └── prompts/
+│   │   │               ├── doc_summary.j2
+│   │   │               ├── scenario_extraction.j2
+│   │   │               ├── next_steps.j2
+│   │   │               └── safety_classification.j2
+│   │   ├── services/
+│   │   │   ├── llm_client.py
+│   │   │   ├── llm_service.py
+│   │   │   ├── retrieval_service.py
+│   │   │   └── feedback_service.py
+│   │   ├── tools/
+│   │   │   ├── retrieve_docs_tool.py
+│   │   │   ├── retrieve_structured_tool.py
+│   │   │   ├── summarise_tool.py
+│   │   │   ├── scenario_extraction_tool.py
+│   │   │   └── next_steps_tool.py
+│   │   └── tests/
+│   │       ├── test_config.py
+│   │       ├── test_health.py
+│   │       ├── test_llm_service.py
+│   │       ├── test_retrieval.py
+│   │       ├── test_tools.py
+│   │       ├── test_graph.py
+│   │       ├── test_safety_policy.py
+│   │       └── test_feedback.py
+│   └── financial-agent-ui/               # UI 项目（Streamlit / 静态页面）
+│       └── ...
+├── support/                              # Docker 和基础设施支持文件
+│   ├── financial-agent-api/
+│   │   └── Dockerfile
+│   ├── financial-agent-ui/
+│   │   └── Dockerfile
+│   └── financial-agent-nginx/
+│       ├── nginx.conf
+│       ├── financial-agent-api.localhost.com.conf
+│       └── financial-agent-ui.localhost.com.conf
 ├── data/                                 # ← 已填充
 │   ├── raw_docs/                         # 3 个清洗后的 CFPB Q&A .txt 文件
 │   └── samples/                          # complaints_sample.csv
@@ -377,24 +407,10 @@ financial-agent/
 │       ├── report.py
 │       ├── export_feedback_to_scenarios.py
 │       └── test_scenarios.yaml
-├── ui/
-│   └── app.py                            # Streamlit
-├── infra/
-│   ├── docker/
-│   │   └── Dockerfile.app
-│   └── docker-compose.yml
-├── tests/
-│   ├── test_config.py
-│   ├── test_llm_service.py
-│   ├── test_retrieval.py
-│   ├── test_tools.py
-│   ├── test_graph.py
-│   ├── test_safety_policy.py
-│   └── test_feedback.py
+├── trainee/                              # 学员指南
 ├── .github/workflows/
 │   └── eval.yml
-├── pyproject.toml
-└── README.md
+└── .gitignore
 ```
 
 ### 已有产物（已在磁盘上）
@@ -409,25 +425,69 @@ financial-agent/
 - `data/raw_docs/credit_card_fees.txt` — 394 词，2 个 CFPB Q&A 部分。
 - `data/raw_docs/mortgage_servicing_policy.txt` — 554 词，2 个 CFPB
   Q&A 部分。
-- `pyproject.toml`（最小化，仅 `httpx` 声明）— 第一个任务会将其
-  扩展为完整的项目依赖集。
 - `.gitignore`、`data_pipelines/__init__.py`，以及两个摄入包。
+- `trainee/` 目录下的学员指南文件。
 
 ### docker-compose 服务形态
 
 ```yaml
 services:
-  app:        # FastAPI + LangGraph
-    depends_on: [db]
-    ports: ["8000:8000"]
-  db:         # PostgreSQL + pgvector
-    image: pgvector/pgvector:pg16  # 或等效镜像
-    volumes: [db_data:/var/lib/postgresql/data]
-  ui:         # Streamlit（随 UI 任务添加）
-    depends_on: [app]
-    ports: ["8501:8501"]
+  financial-agent-api:        # FastAPI + LangGraph
+    build:
+      context: ./codebases/financial-agent-api
+      dockerfile: ../../support/financial-agent-api/Dockerfile
+    depends_on:
+      financial-agent-db:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - financial-agent-network
+
+  financial-agent-db:         # PostgreSQL + pgvector
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - financial-agent-network
+
+  financial-agent-ui:         # UI 服务（占位页面 → Streamlit）
+    build:
+      context: ./codebases/financial-agent-ui
+      dockerfile: ../../support/financial-agent-ui/Dockerfile
+    depends_on:
+      - financial-agent-api
+    networks:
+      - financial-agent-network
+
+  financial-agent-nginx:      # HTTP 反向代理
+    image: nginx:stable-alpine
+    volumes:
+      - ./support/financial-agent-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./support/financial-agent-nginx/financial-agent-api.localhost.com.conf:/etc/nginx/conf.d/financial-agent-api.localhost.com.conf:ro
+      - ./support/financial-agent-nginx/financial-agent-ui.localhost.com.conf:/etc/nginx/conf.d/financial-agent-ui.localhost.com.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - financial-agent-api
+      - financial-agent-ui
+    networks:
+      - financial-agent-network
+
 volumes:
   db_data:
+
+networks:
+  financial-agent-network:
+    driver: bridge
 ```
 
 ---
@@ -462,9 +522,9 @@ volumes:
 
 - 仅使用基于构造函数的依赖注入。不允许全局单例或隐藏构造的模块级
   工厂。`LLMService`、`RetrievalService`、`FeedbackService` 在
-  `app/api/main.py` 中构造一次，并通过 `ServicesContainer` 传递给
-  LangGraph 节点。
-- 所有新函数都带类型提示。`mypy --strict` 在 `app/` 上通过。
+  `codebases/financial-agent-api/src/financial_agent_api/main.py` 中构造一次，
+  并通过 `ServicesContainer` 传递给 LangGraph 节点。
+- 所有新函数都带类型提示。`mypy --strict` 在 `codebases/financial-agent-api/src/` 上通过。
 - I/O 代码路径默认异步。仅在无 I/O 时允许使用同步辅助函数。
 - 所有 DTO（请求体、响应体、LLM 结构化输出、配置、评估场景记录）
   使用 Pydantic v2 模型。

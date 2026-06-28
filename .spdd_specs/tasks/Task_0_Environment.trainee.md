@@ -8,23 +8,19 @@
 
 ## Requirements
 
+Based on `0_Root_Architecture.md`, set up the project environment and scaffold.
+
 ### Analysis context
 
 **Domain keywords scanned:** docker compose, FastAPI, postgres,
-pgvector, healthz/readyz, env file. **Existing artifacts:**
-`data/samples/complaints_sample.csv`, `data/raw_docs/*.txt`,
-`.env.example`. **Prior tasks read:** none — Task 0 is the bootstrap.
+pgvector, healthz
 
 **Strategic direction:** keep the Day-1 surface area microscopic.
-One Dockerfile, one compose file, one `/healthz`, no business
-logic. Anything that can defer to Task 1 (LLM service, settings
-class) defers.
 
-**Risks noticed:** (1) pgvector image variant matters — the
-ARM-on-Mac story is fragile if the image is not multi-arch; (2)
-`.env.example` must list every env key any later Task touches, even
-if Task 0 itself does not use them, so we don't keep editing the
-example file every week.
+1. Scaffold the most basic API project, providing only a `/healthz` endpoint returning 200 OK. Use `uv` for Python project management with version-pinned dependencies.
+2. Scaffold the most basic UI project, referencing the tech stack in the Root Constitution. Visiting `/` should return an empty placeholder page.
+3. For convenient local development, support one-click startup via Docker Compose.
+4. Since the API project will depend on PostgreSQL + pgvector in the future, provision a PostgreSQL database as a dependency of the API project.
 
 ### Why this task exists
 
@@ -32,38 +28,30 @@ A junior developer must be able to run `docker compose up` from a clean
 clone and see a healthy stack within minutes. The agent's correctness
 in later tasks depends on a reproducible runtime where every later
 piece (Postgres, embeddings, LangGraph, evaluation) plugs into the same
-container topology. Without this scaffold, every Task downstream
+container topology. Without this scaffold, every task downstream
 spends time fighting infrastructure instead of building features.
 
 ### Acceptance criteria (Given/When/Then)
 
-- **Given** a clean clone of the repository, a populated `.env`
-  containing `PG_DSN` and Ollama-pointing model fields, and a running
-  local `ollama` daemon (or `OPENROUTER_API_KEY` if the developer is
-  using the OpenRouter escape hatch),
-  **when** the developer runs `docker compose -f infra/docker-compose.yml up --build`,
-  **then** both the `app` and `db` services reach healthy state and
-  `curl http://localhost:8000/healthz` returns `{"status": "ok"}`
-  with HTTP 200.
-- **Given** the `db` service is running,
-  **when** a connection is opened with the project's `PG_DSN`,
-  **then** the `pgvector` extension is installed (`CREATE EXTENSION IF
-  NOT EXISTS vector` succeeds without error).
-- **Given** the test suite is invoked with `pytest tests/test_health.py`,
-  **when** it runs without any external services,
-  **then** all tests pass without hitting the network.
-- **Given** the developer runs `python -m data_pipelines.ingest_tables.build_starter_sample`
-  *and* `python -m data_pipelines.ingest_docs.fetch_starter_docs`,
-  **when** the existing scripts complete,
-  **then** the resulting CSV and `.txt` files are unchanged in shape
-  from what they produced at the end of data-prep (1,000 rows, 4
-  products × 250, three text files in `data/raw_docs/`).
+- **Given** a clean clone of the repository,
+  **when** the developer runs `./start`,
+  **then** a Docker application `financial-agent-spdd` is created with four services
+  `financial-agent-ui`, `financial-agent-db`, `financial-agent-api`, and
+  `financial-agent-nginx`, all reaching healthy state.
+- **Given** all services are running,
+  **when** a browser visits `http://financial-agent-ui.localhost.com`,
+  **then** a page with placeholder information is displayed, and a request
+  `GET http://financial-agent-api.localhost.com/healthz` is visible, returning
+  status 200 with content "ok", and the browser displays the response.
+- **Given** all services are running,
+  **when** a database connection is opened with a connection tool,
+  **then** the `pgvector` extension is installed (`CREATE EXTENSION IF NOT EXISTS vector`
+  succeeds without error).
 
 ### Explicit non-goals for this task
 
-- No LLM client implementation (Task 1).
-- No retrieval logic, no LangGraph nodes, no prompts.
-- No production secret management. Local `.env` is sufficient.
+- Do not add anything to the API project beyond `/healthz`.
+- Do not add anything to the UI project beyond the `/` page.
 
 ---
 
@@ -71,25 +59,36 @@ spends time fighting infrastructure instead of building features.
 
 | Entity | Notes for Task 0 |
 |---|---|
-| `Settings` | Stub class only — declares the env keys, no business logic yet. Concretised in Task 1. |
+| `financial-agent-api` | FastAPI service, only `GET /healthz` returning `{"status":"ok"}`. Uses `uv` for dependency management. |
+| `financial-agent-ui` | Frontend placeholder page service, `/` displays placeholder info and requests API `/healthz` to display the response. |
+| `financial-agent-db` | PostgreSQL 16 + pgvector extension. Uses `pgvector/pgvector:pg16` image. |
+| `financial-agent-nginx` | HTTP reverse proxy, routes domains to corresponding services (ui/api). |
 | `pgvector` | Postgres extension. Must be available in the chosen image; the `pgvector/pgvector:pg16` image is preferred for zero install steps. |
-| `request_id` | Reserved keyword. The `/healthz` handler does not need to emit one yet, but the FastAPI app must already attach a placeholder middleware so Task 1 can extend it. |
-| Existing data artifacts | `data/samples/complaints_sample.csv`, `data/raw_docs/*.txt`. **Task 0 must not touch these files.** It only confirms the layout exists. |
 
 ### Deployment topology overview
 
 Task 0 is the only Task that owns runtime *topology* rather than data
 shapes, so the diagram is a class-level view of the bring-up: which
-container talks to which, and which env keys cross which boundary.
+container talks to which.
 
 ```mermaid
 classDiagram
 direction LR
 
-class App {
+class Nginx {
+  +HTTP reverse proxy
+  +financial-agent-ui.localhost.com → ui:port
+  +financial-agent-api.localhost.com → api:port
+}
+
+class UI {
+  +placeholder page /
+  +GET /healthz → API
+}
+
+class API {
   +FastAPI app
-  +healthz() 200
-  +Settings settings
+  +healthz() → 200
 }
 
 class Db {
@@ -98,29 +97,10 @@ class Db {
   +PG_DSN endpoint
 }
 
-class Ollama {
-  +host daemon (not in compose)
-  +OLLAMA_BASE_URL
-}
-
-class StarterCorpus {
-  <<read-only>>
-  +complaints_sample.csv
-  +raw_docs/*.txt
-}
-
-class Settings {
-  +str PG_DSN
-  +str LLM_PROVIDER
-  +str OLLAMA_BASE_URL
-  +str EMBEDDING_MODEL
-  +int EMBEDDING_DIM
-}
-
-App "1" --> "1" Db          : PG_DSN
-App "1" ..> "1" Ollama      : OLLAMA_BASE_URL (Task 1+)
-App "1" ..> "1" StarterCorpus : reads (Task 2+)
-App "1" *-- "1" Settings    : owns
+Nginx "1" --> "1" UI : reverse proxy
+Nginx "1" --> "1" API : reverse proxy
+UI "1" ..> "1" API : HTTP request
+API "1" --> "1" Db : PG_DSN
 ```
 
 ---
@@ -129,31 +109,57 @@ App "1" *-- "1" Settings    : owns
 
 ### Design decisions
 
-1. **Single-stage `Dockerfile.app`**, not multi-stage, in this Task.
-   Keep the image dumb until there is real Python code to optimise the
-   build cache around. Multi-stage tightening lives in Task 6 alongside
-   the rest of the production hardening.
-2. **`pgvector/pgvector:pg16` image** for the `db` service. Avoid the
-   "install extension at startup" dance by picking an image that already
-   has the binary in place.
-3. **No `langgraph` dependency yet.** Pinning it now risks the version
-   churn breaking Task 3. Add it in Task 3.
-4. **Healthcheck is a flat handler.** `GET /healthz` does *not* check
-   the database. A separate `GET /readyz` handler will be added in
-   Task 1 for that, so the deployment knows the difference between "the
-   process is alive" and "downstream dependencies are reachable".
-5. **`.env.example` lives in repo, `.env` does not.** Developers copy
-   the example. CI uses environment variables directly.
+1. The API project uses `uv` for version management.
+2. The UI project uses the technology mentioned in the Root Constitution.
+3. The NGINX project currently only needs HTTP. Its reverse-proxy domains are
+   routed correctly by configuring entries in the hosts file. Therefore, at
+   startup, check whether the corresponding hosts entries mapping to 127.0.0.1
+   are configured. If not, prompt the user for sudo access to modify them.
+4. All API project code lives under `<rootDir>/codebases/financial-agent-api`.
+5. All UI project code lives under `<rootDir>/codebases/financial-agent-ui`.
+6. All Docker Compose service-related files (Dockerfile, env, etc.) live under
+   the corresponding `support` directory, e.g.
+   `<rootDir>/support/financial-agent-nginx/financial-agent-api.localhost.com.conf`,
+   `<rootDir>/support/financial-agent-api/Dockerfile`.
+7. **`db` service uses the `pgvector/pgvector:pg16` image**. Avoid the
+   "install extension at startup" dance by picking an image that already has
+   the binary in place.
+8. Dependency versions must reference the Root Constitution. If not defined
+   there, use the latest mutually compatible stable versions.
+9. In the API project, each module must have a corresponding test module that
+   can be executed successfully.
 
 ### Trade-offs accepted
 
-- The Dockerfile installs the full project venv inside the runtime
-  image. That is wasteful but simple; Task 6's multi-stage build will
-  shrink it.
-- The repository structure is created upfront in this Task even though
-  most folders will be empty until later Tasks touch them. This is
-  intentional: keeping the layout stable from day one prevents AI
-  from "discovering" alternative locations during code generation.
+- The Dockerfile installs the full project venv inside the runtime image.
+  That is wasteful but simple; Task 6's multi-stage build will shrink it.
+- The repository structure is created upfront in this Task even though most
+  folders will be empty until later Tasks touch them. This is intentional:
+  keeping the layout stable from day one prevents AI from "discovering"
+  alternative locations during code generation.
+
+---
+
+## Execution Plan
+
+Execute the following steps in order:
+
+1. **Scaffold API project** (`codebases/financial-agent-api/`): Use `uv` to manage
+   the Python project, FastAPI framework, only `GET /healthz` endpoint returning
+   `{"status":"ok"}`, include `tests/` test module.
+2. **Scaffold UI project** (`codebases/financial-agent-ui/`): Basic placeholder page,
+   `/` displays placeholder info, frontend requests
+   `GET http://financial-agent-api.localhost.com/healthz` and displays the response.
+3. **Scaffold Nginx reverse proxy**: Place `.conf` files under
+   `support/financial-agent-nginx/`, route domains to corresponding services (HTTP only for now).
+4. **Provision PostgreSQL database**: Use `pgvector/pgvector:pg16` image,
+   service name `financial-agent-db`.
+5. **Write Docker Compose**: Four services `financial-agent-api`, `financial-agent-ui`,
+   `financial-agent-db`, `financial-agent-nginx`. `api` depends on `db`.
+6. **Write `./start` launch script**: Check if `/etc/hosts` has the domain →
+   127.0.0.1 mappings. If missing, prompt user for sudo access to add them.
+   Then run `docker compose up`.
+7. **Create `README.md`** (quickstart, project layout, etc.).
 
 ---
 
@@ -162,71 +168,45 @@ App "1" *-- "1" Settings    : owns
 ### Files this task creates or amends
 
 ```text
-financial-agent/
-├── pyproject.toml                       # AMEND (extend existing)
-├── poetry.lock                          # CREATE
-├── .env.example                         # CREATE
-├── README.md                            # CREATE (skeleton)
-├── infra/
-│   ├── docker/
-│   │   └── Dockerfile.app               # CREATE
-│   └── docker-compose.yml               # CREATE
-├── app/
-│   ├── __init__.py                      # CREATE
-│   ├── api/
-│   │   ├── __init__.py                  # CREATE
-│   │   └── main.py                      # CREATE (healthz only)
-│   ├── core/
-│   │   ├── __init__.py                  # CREATE
-│   │   └── config.py                    # CREATE (skeleton)
-│   ├── services/
-│   │   └── __init__.py                  # CREATE
-│   └── tools/
-│       └── __init__.py                  # CREATE
-└── tests/
-    ├── __init__.py                      # CREATE
-    └── test_health.py                   # CREATE
+financial-agent-spdd_week_00/
+├── start                                 # CREATE (one-click start script)
+├── README.md                             # CREATE (skeleton)
+├── docker-compose.yml                    # CREATE
+├── codebases/
+│   ├── financial-agent-api/              # CREATE (API project)
+│   │   ├── pyproject.toml                # CREATE (uv project config)
+│   │   ├── uv.lock                       # CREATE (uv lock file)
+│   │   ├── src/
+│   │   │   └── financial_agent_api/
+│   │   │       ├── __init__.py           # CREATE
+│   │   │       ├── main.py               # CREATE (FastAPI + /healthz)
+│   │   └── tests/
+│   │       ├── __init__.py               # CREATE
+│   │       └── test_health.py            # CREATE
+│   └── financial-agent-ui/               # CREATE (UI project)
+│       ├── package.json                  # CREATE
+│       ├── public/
+│       │   └── index.html                # CREATE (placeholder page)
+│       └── src/
+│           └── App.js                    # CREATE (calls API /healthz)
+├── support/
+│   ├── financial-agent-api/
+│   │   └── Dockerfile                    # CREATE
+│   ├── financial-agent-ui/
+│   │   └── Dockerfile                    # CREATE
+│   └── financial-agent-nginx/
+│       ├── nginx.conf                    # CREATE
+│       ├── financial-agent-api.localhost.com.conf   # CREATE
+│       └── financial-agent-ui.localhost.com.conf    # CREATE
+└── .spdd_specs/
+    └── tasks/
+        └── Task_0_Environment.trainee.md  # AMEND (this file)
 ```
 
 ### Existing files this task must respect
 
-- `pyproject.toml` already declares `httpx>=0.27,<1.0`. Extend in
-  place; do not rewrite from scratch.
-- `data_pipelines/__init__.py`, `data_pipelines/ingest_tables/__init__.py`,
-  `data_pipelines/ingest_docs/__init__.py` already exist. Leave alone.
-- `.gitignore` already exists. Append entries only if needed.
-- `.venv/` is created by the developer; do not commit it.
-
-### Configuration shape
-
-`.env.example`:
-
-```dotenv
-# Provider posture: Ollama primary, OpenRouter optional escape hatch.
-LLM_PROVIDER=ollama
-
-# Postgres connection. Host loopback for ingest / eval scripts that run
-# outside compose; override to db:5432 inside the compose network.
-PG_DSN=postgresql+psycopg://app:app@localhost:5432/app
-
-# Logging mode: 'json' for production, 'text' for local dev.
-LOG_FORMAT=text
-
-# Ollama (local) — set OLLAMA_CHAT_MODEL to whatever `ollama list` shows.
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=gemma3:27b
-OLLAMA_OPS_MODEL=qwen3.5:4b
-
-# Embeddings. nomic-embed-text -> 768 dim. If you change the model,
-# update EMBEDDING_DIM and re-apply the schema (immutable column type).
-EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_DIM=768
-
-# OpenRouter (optional). Required only when LLM_PROVIDER=openrouter.
-# OPENROUTER_API_KEY=
-# OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-# OPENROUTER_MODEL=gpt-4.1-mini
-```
+- All files under `.spdd_specs/` remain unchanged (except this file).
+- All files under `trainee/` remain unchanged.
 
 #### Compute paths — pick whichever fits your machine
 
@@ -262,178 +242,192 @@ the one that keeps your laptop fans honest and your tab open.
    use Cline, Continue, Windsurf, or another plan, it works fine.
    The curriculum does not mandate a specific provider.
 
-### `infra/docker-compose.yml` skeleton (target shape)
-
-```yaml
-version: "3.9"
-
-services:
-  app:
-    build:
-      context: ..
-      dockerfile: infra/docker/Dockerfile.app
-    env_file: ../.env
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: app
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-volumes:
-  db_data:
-```
-
 ---
 
-## Operations (strict execution order)
+## Operation Steps (strict execution order)
 
 Your AI coding tool must perform these steps top-to-bottom and stop on the first
 failure.
 
-1. **Extend `pyproject.toml`.** Add the runtime deps for Task 0/1:
+### Step 1: Scaffold API Project (`codebases/financial-agent-api/`)
 
-   ```toml
-   [project]
-   dependencies = [
-       "httpx>=0.27,<1.0",
-       "fastapi>=0.115,<0.120",
-       "uvicorn[standard]>=0.30,<1.0",
-       "pydantic>=2.7,<3.0",
-       "pydantic-settings>=2.4,<3.0",
-       "loguru>=0.7,<1.0",          # OR structlog; pick exactly one
-   ]
+1.1 Initialize the project with `uv init`, or manually create `pyproject.toml`.
 
-   [project.optional-dependencies]
-   dev = [
-       "pytest>=8.0,<9.0",
-       "pytest-asyncio>=0.23,<1.0",
-       "httpx[http2]>=0.27",        # for ASGI test client
-       "mypy>=1.10,<2.0",
-       "ruff>=0.5,<1.0",
-   ]
-   ```
+1.2 `pyproject.toml` dependency configuration:
 
-   Generate `poetry.lock` if Poetry is in use; otherwise document the
-   `uv` equivalent in `README.md`.
+```toml
+[project]
+name = "financial-agent-api"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115,<0.120",
+    "uvicorn[standard]>=0.30,<1.0",
+    "pydantic>=2.7,<3.0",
+    "pydantic-settings>=2.4,<3.0",
+    "loguru>=0.7,<1.0",
+    "httpx>=0.27,<1.0",
+]
 
-2. **Scaffold packages.** Create empty `__init__.py` files for `app/`,
-   `app/api/`, `app/core/`, `app/services/`, `app/tools/`, and
-   `tests/`. Do not create the `app/core/prompts/` folder yet (Task 4).
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "httpx[http2]>=0.27",
+    "mypy>=1.10,<2.0",
+    "ruff>=0.5,<1.0",
+]
+```
 
-3. **Write `app/core/config.py` skeleton.**
+1.3 Create `src/financial_agent_api/__init__.py` (empty file).
 
-   ```python
-   from typing import Literal
-   from pydantic import model_validator
-   from pydantic_settings import BaseSettings, SettingsConfigDict
+1.4 Write `src/financial_agent_api/main.py`:
 
-   class Settings(BaseSettings):
-       model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+```python
+"""Financial Helpdesk Agent — FastAPI application entry point."""
 
-       pg_dsn: str
-       llm_provider: Literal["ollama", "openrouter"] = "ollama"
-       ollama_base_url: str = "http://localhost:11434"
-       ollama_chat_model: str = "gemma3:27b"
-       ollama_ops_model: str = "qwen3.5:4b"
-       embedding_model: str = "nomic-embed-text"
-       embedding_dim: int = 768
-       openrouter_api_key: str | None = None
-       openrouter_model: str = "gpt-4.1-mini"
-       log_format: Literal["json", "text"] = "text"
+from fastapi import FastAPI
 
-       @model_validator(mode="after")
-       def _require_openrouter_key(self) -> "Settings":
-           if self.llm_provider == "openrouter" and not self.openrouter_api_key:
-               raise ValueError("OPENROUTER_API_KEY required when LLM_PROVIDER=openrouter")
-           return self
+app = FastAPI(title="Financial Helpdesk Agent", version="0.0.0")
 
-   def get_settings() -> Settings:
-       return Settings()  # Task 1 will replace with @lru_cache
-   ```
 
-   No business logic; this exists so the FastAPI app can import it.
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+```
 
-4. **Write `app/api/main.py` with one route.**
+1.5 Write `tests/__init__.py` (empty file).
 
-   ```python
-   from fastapi import FastAPI
+1.6 Write `tests/test_health.py`:
 
-   app = FastAPI(title="Financial Helpdesk Agent", version="0.0.0")
+```python
+"""Tests for the /healthz endpoint."""
 
-   @app.get("/healthz")
-   def healthz() -> dict[str, str]:
-       return {"status": "ok"}
-   ```
+from fastapi.testclient import TestClient
+from financial_agent_api.main import app
 
-5. **Write `infra/docker/Dockerfile.app`.** Single-stage Python 3.11
-   slim base. Install Poetry (or `uv`), copy `pyproject.toml` and
-   `poetry.lock` first, install deps, then copy `app/`. Run as a
-   non-root user. Final command:
+client = TestClient(app)
 
-   ```dockerfile
-   CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-   ```
 
-6. **Write `infra/docker-compose.yml`** matching the skeleton above.
+def test_healthz_returns_ok():
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+```
 
-7. **Write `.env.example`** matching the configuration shape above.
+1.7 Run `uv lock` to generate `uv.lock`, then `uv run pytest tests/` to verify
+   tests pass.
 
-8. **Write `README.md` skeleton.** Sections: *Quickstart*, *Project
-   Layout*, *Data Prep*, *Health Endpoints*. Quickstart commands:
+### Step 2: Scaffold UI Project (`codebases/financial-agent-ui/`)
 
-   ```bash
-   cp .env.example .env
-   # If using Ollama (default): pull models once
-   #   ollama pull gemma3:27b
-   #   ollama pull qwen3.5:4b
-   #   ollama pull nomic-embed-text
-   # If using OpenRouter: set OPENROUTER_API_KEY and LLM_PROVIDER=openrouter
-   docker compose -f infra/docker-compose.yml up --build
-   curl http://localhost:8000/healthz
-   ```
+2.1 Create `package.json`, using a simple static HTML page (no heavy framework,
+   in keeping with the "minimal surface area" principle).
 
-9. **Write `tests/test_health.py`.** Use FastAPI's `TestClient` to hit
-   `/healthz` and assert the JSON body. Must not import `Settings`
-   directly so it runs without environment variables set.
+2.2 Create `public/index.html` — placeholder page containing:
+- Project title "Financial Helpdesk Agent"
+- Placeholder information
+- JavaScript calling `GET http://financial-agent-api.localhost.com/healthz`
+  and displaying the response.
 
-10. **Verify locally.** Run `pytest tests/test_health.py` *and*
-    `docker compose -f infra/docker-compose.yml up --build` (in the
-    background; the developer can `Ctrl-C`). Confirm both succeed.
+2.3 Create `src/App.js` (if using a framework like React), otherwise inline JS
+   directly in `index.html`.
 
-11. **Print a final summary** listing files created, files amended, and
-    the verification commands the user can rerun.
+2.4 The UI project only needs to serve `/` returning this page via an HTTP server.
+
+### Step 3: Scaffold Nginx Reverse Proxy (`support/financial-agent-nginx/`)
+
+3.1 Create `nginx.conf` (main configuration).
+
+3.2 Create `financial-agent-api.localhost.com.conf` — reverse proxy to
+   `financial-agent-api:8000`.
+
+3.3 Create `financial-agent-ui.localhost.com.conf` — reverse proxy to the
+   `financial-agent-ui` service port.
+
+3.4 HTTP only for now (port 80).
+
+### Step 4: Write Dockerfiles for Each Service
+
+4.1 `support/financial-agent-api/Dockerfile` — single-stage build, Python 3.11
+   slim base image:
+- Install `uv`
+- Copy `pyproject.toml` and `uv.lock` first, install dependencies
+- Then copy `src/`
+- Run as non-root user
+- CMD: `["uv", "run", "uvicorn", "financial_agent_api.main:app", "--host", "0.0.0.0", "--port", "8000"]`
+
+4.2 `support/financial-agent-ui/Dockerfile` — based on nginx or node image,
+   serving the static page.
+
+### Step 5: Write `docker-compose.yml`
+
+5.1 Four services: `financial-agent-api`, `financial-agent-ui`,
+   `financial-agent-db`, `financial-agent-nginx`.
+
+5.2 `financial-agent-db` uses `pgvector/pgvector:pg16` image, health check
+   using `pg_isready`.
+
+5.3 `financial-agent-api` depends on `financial-agent-db`
+   (`condition: service_healthy`).
+
+5.4 All services join the same Docker network, Nginx exposes port 80.
+
+### Step 6: Write `./start` Launch Script
+
+6.1 Check if `/etc/hosts` already has the following mappings:
+```
+127.0.0.1 financial-agent-ui.localhost.com
+127.0.0.1 financial-agent-api.localhost.com
+```
+
+6.2 If missing, prompt the user and request sudo access to add them.
+
+6.3 Run `docker compose up --build -d`.
+
+6.4 Once all services are healthy, print the access URLs:
+- UI: `http://financial-agent-ui.localhost.com`
+- API healthz: `http://financial-agent-api.localhost.com/healthz`
+- DB: `localhost:5432`
+
+### Step 7: Create README
+
+7.1 Create `README.md` skeleton with sections: *Quickstart*, *Project Layout*,
+   *Health Endpoints*.
+
+### Step 8: Local Verification
+
+8.1 Run `./start` to confirm all services start successfully.
+
+8.2 Run `curl -fsS http://financial-agent-api.localhost.com/healthz` expecting
+   `{"status":"ok"}`.
+
+8.3 Browser visit `http://financial-agent-ui.localhost.com` to confirm the
+   placeholder page displays correctly and the API request succeeds.
+
+8.4 Enter `codebases/financial-agent-api/`, run `uv run pytest tests/` to confirm
+   tests pass.
+
+8.5 Connect to the database, execute `CREATE EXTENSION IF NOT EXISTS vector;` to
+   confirm pgvector is installed.
 
 ---
 
 ## Norms
 
-- Folder packaging: every directory under `app/` and `tests/` has an
+### API Project
+- Folder packaging: every directory under `src/` and `tests/` has an
   `__init__.py` even if empty. This avoids implicit namespace packages
   and makes `mypy` happy.
 - Python files start with a one-line module docstring describing intent.
-- Configuration access is always through `get_settings()`; never read
-  `os.environ` directly outside `config.py`.
 - Imports order: standard library, third-party, local. One blank line
   between groups.
 - Line length: 100 characters; enforced by `ruff` defaults.
+
+### Docker
 - Docker layer order is dependency-files-first, code-second. Bust the
   cache only on dependency changes.
+- Dockerfiles live under `support/<service-name>/`, not in the code
+  directories.
 
 ---
 
@@ -441,24 +435,18 @@ failure.
 
 ### What this task must NOT do
 
-1. **Do not create or modify any file under `data/`.** The starter
-   corpus is read-only from this point onward.
-2. **Do not pull `langgraph` or `langchain-core` into `pyproject.toml`.**
+1. **Do not add anything to the API project beyond `/healthz`.**
+2. **Do not add anything to the UI project beyond the `/` page.**
+3. **Do not pull `langgraph` or `langchain-core` into dependencies.**
    Those are Task 3 dependencies.
-3. **Do not implement `LLMService` or `RetrievalService` stubs.** Task 1
-   owns the LLM abstraction; Task 2 owns retrieval.
-4. **Do not add a vector-store service to `docker-compose.yml`.**
+4. **Do not implement `LLMService` or `RetrievalService`.**
+   Task 1 owns the LLM abstraction; Task 2 owns retrieval.
+5. **Do not add a standalone vector-store service to `docker-compose.yml`.**
    `pgvector` runs inside the `db` Postgres container.
-5. **Do not add `chroma`, `qdrant`, `weaviate`, or `faiss` to deps.**
-6. **Do not add Streamlit yet.** UI is Task 5.
-7. **Do not add a database migration tool yet** (no Alembic, no Atlas).
-   Schema creation belongs to Task 2's ingestion script for the first
-   time. A migration tool can be introduced in Task 6 if the AI can
-   justify it in the canvas.
-8. **Do not bake secrets into images.** All secrets come from `.env`
-   via `env_file` in compose.
-9. **Do not run network-dependent tests in CI by default.** Mark them
-   `@pytest.mark.network` and skip unless an env flag is set.
+6. **Do not add `chroma`, `qdrant`, `weaviate`, or `faiss` to deps.**
+7. **Do not bake secrets into images.**
+8. **Do not create or modify any file under `data/`.** The starter
+   corpus is read-only from this point onward.
 
 ### Error handling specifics
 
@@ -467,16 +455,25 @@ failure.
   that runs `CREATE EXTENSION vector;`. Document the fallback in
   `README.md`. Do not silently change the image without updating the
   README.
-- If `pyproject.toml` already contains a dependency at a different
-  version than this canvas requires, raise the conflict in the run
-  log and stop; do not "auto-resolve" by upgrading or downgrading.
+- If the `./start` script fails to modify `/etc/hosts`, print a clear
+  error message and exit.
 
 ### Verification command (printed to the user at the end)
 
 ```bash
-cp .env.example .env  # then either start `ollama serve` (default), or
-                       # set OPENROUTER_API_KEY + LLM_PROVIDER=openrouter
-pytest tests/test_health.py
-docker compose -f infra/docker-compose.yml up --build
-curl -fsS http://localhost:8000/healthz   # expect {"status":"ok"}
+# 1. One-click start all services
+./start
+
+# 2. API health check
+curl -fsS http://financial-agent-api.localhost.com/healthz   # expect {"status":"ok"}
+
+# 3. UI page access
+# Browser open http://financial-agent-ui.localhost.com
+
+# 4. API project tests
+docker compose exec financial-agent-api uv run pytest tests/ -v
+
+# 5. Database pgvector extension verification
+# Connect using PG_DSN, then execute:
+# CREATE EXTENSION IF NOT EXISTS vector;
 ```
