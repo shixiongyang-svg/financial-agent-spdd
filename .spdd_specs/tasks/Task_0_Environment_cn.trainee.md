@@ -413,7 +413,7 @@ curl -fsS http://financial-agent-api.localhost.com/healthz   # 期望返回 {"st
 # 浏览器打开 http://financial-agent-ui.localhost.com
 
 # 4. API 项目测试
-cd codebases/financial-agent-api && uv run pytest tests/ -v
+docker compose exec financial-agent-api uv run pytest tests/ -v
 
 # 5. 数据库 pgvector 扩展验证
 # 使用 PG_DSN 连接后执行：

@@ -471,7 +471,7 @@ curl -fsS http://financial-agent-api.localhost.com/healthz   # expect {"status":
 # Browser open http://financial-agent-ui.localhost.com
 
 # 4. API project tests
-cd codebases/financial-agent-api && uv run pytest tests/ -v
+docker compose exec financial-agent-api uv run pytest tests/ -v
 
 # 5. Database pgvector extension verification
 # Connect using PG_DSN, then execute:
