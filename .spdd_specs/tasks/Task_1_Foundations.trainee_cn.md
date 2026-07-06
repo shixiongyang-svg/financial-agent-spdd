@@ -9,18 +9,18 @@
 > **依赖：** `Task_0_Environment.md`（已完成，与最终版本相同）。
 > **解锁：** `Task_2_Ingestion.trainee.md`、`Task_3_Orchestration.trainee.md`。
 
-**✅ 状态：已Approved**
-
 ---
 
 ## 需求
 
 ### 分析上下文
 
+TODO AI根据目前的实现，对提到的目录，产物等进行更新，如果没有的，标识为没有
+
 **扫描到的领域关键词：** LLMService、OpenRouter、Ollama、
 embeddings、settings、request_id、结构化日志、重试。
-**现有产出物：** `.env.example`（不存在，待本任务创建）、`app/` 骨架（不存在；实际代码位于 `codebases/financial-agent-api/src/financial_agent_api/`，当前仅有 `main.py` 含 `/healthz` 端点及空 `__init__.py`，无 `core/`、`services/` 子目录）。
-**已阅读的前置任务：** 任务 0（`/healthz` 端点、CORSMiddleware、FastAPI 项目骨架；settings 桩代码**不存在**）。
+**现有产出物：** `.env.example`、任务 0 创建的 `app/` 骨架。
+**已阅读的前置任务：** 任务 0（环境变量、healthz、settings 桩代码）。
 
 **战略方向：** 一个提供商无关的外观层，统一处理对话 +
 嵌入，通过 `Settings` 配置。重试和结构化输出解析隐藏在外观层
@@ -155,27 +155,11 @@ embeddings、settings、request_id、结构化日志、重试。
 
 ##### 可选方案
 
-（由AI填充）
-
-**方案 A：固定次数 + 固定退避间隔**
-- 重试 3 次，每次等待固定 1s
-- 实现最简单；对小 Prompt 浪费等待，对大 Prompt 可能不够
-- 适合概念验证阶段
-
-**方案 B：固定次数 + 指数退避（含 jitter）**
-- 重试 3 次，退避时间 = min(base × 2^attempt + random_jitter, max_wait)，如 1s→2s→4s
-- 符合验收标准（最多 3 次），指数退避避免服务端雪崩，jitter 避免惊群
-- 不区分 Prompt 大小；通过全局 `timeout` 参数兜底整体耗时
-- **本阶段推荐**：实现清晰，与 httpx 的 `timeout` 正交配合
-
-**方案 C：基于 Prompt token 估算的动态重试预算**
-- 粗估 token 数（字符数 / 4），token > 阈值时减少重试次数
-- 更精细控制成本，但需维护阈值策略，过早引入复杂度
-- 适合任务 4+ Prompt 较大时再引入
+TODO AI 填充 （填充后保留这里由AI填充字样）
 
 ##### 最终选择
 
-我们接受方案B，因为方案B考虑了等待，也使用了timeout进行兜底确保不会因为指数避让导致时间过长，且实现成本更小，尽管没有根据Prompt动态估算token数来决定重试次数，从而在某种程度上节省Token
+在AI填充可选方案后，用户根据方案进行取舍决定
 
 #### 日志量 vs 可追踪性
 
@@ -190,24 +174,11 @@ embeddings、settings、request_id、结构化日志、重试。
 
 ##### 可选方案
 
-（由AI填充）
-
-**方案 A：全链路 DEBUG 日志**
-- 每个中间步骤都打 `logger.debug`；生产关闭 DEBUG 级别
-- 可追踪性最高，但日志量大，I/O 压力大
-
-**方案 B：逻辑单元边界日志（仅输入 + 输出）**
-- 只在逻辑单元的入口（参数）和出口（返回值 / 异常）各打一条 INFO
-- 每条日志携带 `request_id`，可完整复现任意一次请求
-- 与本文档"日志量 vs 可追踪性"分析结论一致；**本阶段推荐**
-
-**方案 C：结构化采样日志**
-- 生产按一定比例采样（如 1%）打 DEBUG；100% 打 INFO 边界日志
-- 灵活，但需要采样基础设施支持，当前阶段过重
+TODO AI 填充 （填充后保留这里由AI填充字样）
 
 ##### 最终选择
 
-我们接受方案B，因为其日志量更少，且满足了可追踪性的基本要求，同时实现成本相对更小，尽管少了详细DEBUG日志
+在AI填充可选方案后，用户根据方案进行取舍决定
 
 #### Pydantic 验证的严格性 vs 开发者体验
 
@@ -217,54 +188,26 @@ embeddings、settings、request_id、结构化日志、重试。
 
 ##### 可选方案
 
-（由AI填充）
-
-**方案 A：全量严格校验**
-- 对 URL 格式、API key 前缀（`sk-or-`）、model 名称合法字符等逐一添加 `@field_validator`
-- 最早发现配置错误，但开发者调试时频繁遇到校验失败；维护成本高
-
-**方案 B：仅校验必填字段存在性 + 基本类型**
-- `model_validator` 只做"openrouter 模式下 api_key 不能为空"；其他字段只做 Pydantic 的类型推断
-- 开发者友好，错误在运行时才被外部系统拒绝
-- **本阶段推荐**：符合文档中"校验基础数据格式，尽量放宽限制"的原则
-
-**方案 C：分层校验（Settings + 运行时 guard）**
-- Settings 只做最基础校验；在 `LLMHTTPClient` 初始化时再做运行时检查（如 URL 可达性 ping）
-- 将配置校验和服务可用性校验分离，但增加了启动时间
+TODO AI 填充 （填充后保留这里由AI填充字样）
 
 ##### 最终选择
 
-我们接受方案B，因为其保证了必填信息的存在和类型的正确，尽管其无法保证配置信息的有效性，但是任何配置信息都应该在上线时，进行人工/自动化测试确保其有效性。
+在AI填充可选方案后，用户根据方案进行取舍决定
 
 #### 结构化输出强制执行 vs LLM 合规性
 
-我们应该追求输出的确定性，即要么确定性的正确输出，要么时确定性的失败，而不是成功时，但是输出并不是预期的情况。
+在做结构化输出强制执行的同时，可能会输出一些不满足LLM合规性的信息。
 
-如果模型不支持，我们未来可以通过引入一些中间件，来兼容结构化输出prompt到自觉性prompt的转换和可能出现的非结构化输出到结构化输出的转换。
+我们不应该在任何地方在非必要的情况下，显示打印/存储不满足LLM合规性的信息，如果确实需要打印/存储，至少，应该带有明显的统一的标签来标识此处信息有合规性风险，
+其次，应该进行根据具体信息的属性进行不同程度的掩盖处理，最后，如果明确要求明文输出，则不允许存在批量获取此类信息的接口，且针对此类信息应该提供单独的接口进行获取，且接口内部一定要有清晰的审计日志（谁，在什么时间，拿了哪条数据的哪个合规性数据）。
 
 ##### 可选方案
 
-（由AI填充）
-
-**方案 A：始终使用 API 强制结构化输出，解析失败即抛异常（本阶段推荐）**
-- 所有 LLM 调用统一传入 `response_format={"type":"json_object"}`；Pydantic 解析失败直接抛 `LLMOutputValidationError`，原始响应记录在异常 `payload` 中
-- 行为完全确定：要么得到类型安全的结构化对象，要么得到明确的异常，不存在"成功但输出不符合预期"的中间状态
-- 上层调用方可按需决定重试策略，职责清晰
-- 当前阶段 Ollama / OpenRouter 均支持 `json_object` 模式，无兼容性问题；未来若遇到不支持的模型，在 `LLMHTTPClient` 层引入中间件处理，上层逻辑不受影响
-
-**方案 B：优先 API 强制，降级为 Prompt 自觉性输出**
-- 先尝试 `response_format`；若 provider 返回"不支持"错误，则退回到 Prompt 中要求模型输出 JSON，解析失败时抛异常
-- 增加了 provider 兼容性，但引入了"Prompt 自觉"路径，输出不再完全确定——模型可能在 Prompt 路径下成功返回但格式错误，违背确定性原则
-- 适合需要同时支持大量不同能力模型的场景，当前阶段过重
-
-**方案 C：始终依赖 Prompt 自觉性，解析失败时重试**
-- 不使用 `response_format`，仅在 Prompt 中要求 JSON 输出；解析失败时重试或抛异常
-- 兼容性最佳，但成功路径下仍可能出现格式偏差（模型加废话前缀、字段缺失等），无法保证确定性
-- 不符合"确定性正确或确定性失败"的原则
+TODO AI 填充 （填充后保留这里由AI填充字样）
 
 ##### 最终选择
 
-我们接受方案A，因为其完全符合追求确定性的核心思想，尽管可能出现异常，但是我们还是尽可能选择支持的模型来对接
+在AI填充可选方案后，用户根据方案进行取舍决定
 
 ---
 
@@ -272,36 +215,30 @@ embeddings、settings、request_id、结构化日志、重试。
 
 ### 文件布局
 
+TODO AI根据当前目录的情况对目录结构进行更新
+
 ```
-codebases/financial-agent-api/
-├── src/
-│   └── financial_agent_api/
-│       ├── core/
-│       │   ├── config.py             # Settings + get_settings()（待创建）
-│       │   ├── logging.py            # configure_logging + bind_request_id（待创建）
-│       │   ├── exceptions.py         # LLMProviderError, LLMOutputValidationError（待创建）
-│       │   └── services_container.py # ServicesContainer 数据类（待创建）
-│       ├── services/
-│       │   ├── llm_client.py         # LLMHTTPClient（httpx 封装）（待创建）
-│       │   └── llm_service.py        # LLMService（提供商切换）（待创建）
-│       ├── __init__.py               # 已存在（空）
-│       └── main.py                   # 已存在：/healthz；本任务新增 lifespan + /readyz
-├── tests/
-│   ├── __init__.py                   # 已存在
-│   ├── test_health.py                # 已存在
-│   ├── test_config.py                # 待创建
-│   ├── test_llm_service.py           # 待创建
-│   └── test_logging.py               # 待创建
-├── pyproject.toml                    # 已存在
-├── uv.lock                           # 已存在
-└── .env.example                      # 不存在，待本任务创建
+app/
+├── core/
+│   ├── config.py             # Settings + get_settings()
+│   ├── logging.py            # configure_logging + bind_request_id
+│   ├── exceptions.py         # LLMProviderError, LLMOutputValidationError
+│   └── services_container.py # ServicesContainer 数据类
+├── services/
+│   ├── llm_client.py         # LLMHTTPClient（httpx 封装）
+│   └── llm_service.py        # LLMService（提供商切换）
+└── api/
+    └── main.py               # lifespan 装配容器；在此添加 /readyz
 ```
 
 ### 方法签名（契约）
 
+TODO AI根据截止本任务所真实需要的config进行设置，而不是一次性设置所有，因此对Settings的内容要进行更新
+
 ```python
 # app/core/config.py
 class Settings(BaseSettings):
+    pg_dsn: str
     llm_provider: Literal["ollama", "openrouter"] = "ollama"
     log_format: Literal["json", "text"] = "text"
     # 条件性字段，见验收标准
@@ -312,19 +249,15 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "gemma3:27b"
     ollama_ops_model: str = "qwen3.5:4b"
-    # Task 2 起添加:
-    # pg_dsn: PostgresDsn
-    # embedding_model: str = "nomic-embed-text"
-    # embedding_dim: int = 768
+    embedding_model: str = "nomic-embed-text"
+    embedding_dim: int = 768
 
 
 @lru_cache
 def get_settings() -> Settings: ...
 
 
-# get_settings() 使用 @lru_cache 保证进程内单例。
-# 测试中可通过 get_settings.cache_clear() 重置以注入不同配置。
-# pydantic-settings 文档：https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+TODO AI扩展方法用途说明，如果有外部链接进行辅助说明，也要贴上
 
 # app/services/llm_service.py
 class LLMService:
@@ -341,7 +274,6 @@ class LLMService:
             request_id: str | None = None,
     ) -> str: ...
 
-    # Task 2 起实现；此处仅定义签名存根
     async def embed(
             self,
             inputs: list[str],
@@ -355,30 +287,35 @@ class LLMService:
 
 ## 操作步骤（严格按顺序执行）
 
+TODO AI根据之前的目录对提到的文件或者是目录位置进行更新
+
 > 前 4 步是固定的。步骤 5+ 是 **TODO(trainee)** —
 > 根据验收标准 + 你的方案推导出来。你的
 > 导师会在你生成代码之前签收完整的操作步骤列表。
 
-1. **替换任务 0 的 `Settings` 桩代码**：在 `src/financial_agent_api/core/config.py` 中
+1. **替换任务 0 的 `Settings` 桩代码**：在 `app/core/config.py` 中
    用 *结构* 章节的完整 Pydantic Settings 模型替换。添加
    `@lru_cache` 工厂函数。
-2. **实现 `src/financial_agent_api/core/logging.py`**，包含 `configure_logging` 和
+2. **实现 `app/core/logging.py`**，包含 `configure_logging` 和
    `bind_request_id`。从 `Settings.log_format` 读取格式。
-3. **实现 `src/financial_agent_api/core/exceptions.py`**，包含两个异常
+3. **实现 `app/core/exceptions.py`**，包含两个异常
    类。它们必须安全地序列化 `payload`（在打印时）。
-4. **实现 `src/financial_agent_api/services/llm_client.py`**，封装
+4. **实现 `app/services/llm_client.py`**，封装
    `httpx.AsyncClient`。构造函数接受 `base_url`、`api_key`
    和可选的 `transport`，以便测试可以注入
    `httpx.MockTransport`。
 
-5. **TODO(trainee) — 实现 `LLMService.complete`**，支持两个提供商。
+5. **TODO(trainee) — 实现 `LLMService`**，支持两个提供商。
    提示："瞬态"失败不仅包括 HTTP 5xx — 还包括
    连接级错误（`httpx.TimeoutException`、
    `httpx.RequestError`）。在编写重试循环之前确定你的
    重试判定逻辑，并在你的权衡章节中记录该选择。
-   使用验收标准中已确定的对话端点。
-   `embed` 方法在 Task 2 中与 `embedding_model`、`embedding_dim` 一同实现。
-6. **TODO(trainee) — 将 `ServicesContainer` 接入 `src/financial_agent_api/main.py`
+   对于 `complete`，使用验收标准中已确定的对话端点。
+   对于 `embed`，标准路径为
+   `embeddings`（OpenRouter）和 `api/embeddings`（Ollama，
+   每次调用一个向量 — 你需要编写一个客户端侧的批量
+   循环）。在你的权衡章节中记录任何偏差。
+6. **TODO(trainee) — 将 `ServicesContainer` 接入 `app/api/main.py`
    的 lifespan，并添加 `/readyz`。** 在修改 `main.py` 时，添加
    request-id 中间件：读取传入的 `X-Request-Id`
    请求头（如果存在），否则生成一个 UUIDv4；通过
@@ -394,7 +331,7 @@ class LLMService:
    以及如何运行 `pytest` + `mypy --strict`。最终版
    README 的 *本地开发* 章节在你起草完自己的版本后是一个有用的参考。
 9. **验证**：运行 `pytest`、`ruff check .`、`mypy --strict
-   --explicit-package-bases src`，以及
+   --explicit-package-bases app data_pipelines`，以及
    `./scripts/smoke.sh`（该脚本从任务 3+ 开始存在；在此之前，
    手动执行 `curl /healthz` 和 `curl /readyz`）。
 
@@ -446,172 +383,15 @@ class LLMService:
 TODO AI需要根据这些问题填充问题的答案，由客户确认更新所有问题为解决后，再进行实现计划的填充
 
 1. 在TODO风险识别这里，我列出来了8项，每项你都要给出是否是现阶段必须要解决的风险，如果是，则需要在实现计划中明确解决思路
-   **[AI回答]**
-   - 风险1（未引入多环境配置）：**现阶段不必须**。本任务只需支持本地 `.env`，多环境配置（dev/staging/prod）在后续 CI/CD 阶段处理。
-   - 风险2（环境变量明文配置）：**现阶段不必须**，但需确保 `.env` 已加入 `.gitignore`（任务 0 约束），`.env.example` 只含占位符（安全措施 5 覆盖）。
-   - 风险3（API KEY过期/超限后持续错误）：**现阶段必须部分解决**。重试 3 次后需抛出 `LLMProviderError`（验收标准覆盖），不能无限重试；但速率限制的特殊处理（429 不应重试）需在实现计划中明确。
-   - 风险4（未限定LLM回复固定格式）：**现阶段不必须**。`response_format` 参数已在 `complete` 签名中预留，强制结构化输出在 Task 4 中使用。
-   - 风险5（返回消息解析失败后缺少原因分析）：**现阶段不必须**。`LLMOutputValidationError` 在此定义但 Task 4 才使用；原始 payload 存入异常供上层分析，已足够。
-   - 风险6（AsyncClient级别日志拦截器缺失）：**现阶段必须解决**。`LLMHTTPClient` 封装 httpx 时，应在统一位置（`llm_client.py`）处理请求/响应日志，避免后续遗漏。实现计划中明确：在 `LLMHTTPClient` 的 `request` 方法打入/出边界日志。
-   - 风险7（Settings在所有环境支持`python -c`导致配置泄漏）：**现阶段不必须**。当前阶段只有开发环境，生产部署限制（禁止 `-c`、只读挂载等）属于运维规范，超出本任务范围。
-   - 风险8（Retry节点控制，避免嵌套Retry）：**现阶段必须解决**。`LLMService.complete` 内的重试不应与外层调用方的重试叠加。实现计划中明确：重试逻辑**只在 `LLMService` 内部**，调用方不应再包一层重试。
-   - 风险9（截断提示词是否应全量存储）：**现阶段不必须**。本任务先按规范截断到 500 字符 + `_truncated: true` 标记；全量存储（如写入结构化日志 sink）在可观测性需求确认后再引入。
 2. OpenRouter是啥？如何使用
-   **[AI回答]**
-   OpenRouter（https://openrouter.ai）是一个统一的 LLM API 代理平台，提供兼容 OpenAI 格式的 REST API，后端可路由到 GPT-4、Claude、Gemini、Mistral 等数十个模型。
-
-   使用方式：
-   1. 注册并在 https://openrouter.ai/keys 获取 API Key（格式 `sk-or-v1-...`）
-   2. 将 Key 设为环境变量 `OPENROUTER_API_KEY`
-   3. 调用端点：`POST https://openrouter.ai/api/v1/chat/completions`，请求体与 OpenAI Chat Completions API 完全一致
-   4. 请求头需携带 `Authorization: Bearer <key>`，可选 `HTTP-Referer`（标识来源）
-
-   本项目中通过 `LLMService.complete` 封装，调用方无需关心具体 HTTP 细节。
 3. Ollama是啥？如何使用
-   **[AI回答]**
-   Ollama（https://ollama.ai）是本地运行开源 LLM 的工具，支持 Llama、Gemma、Qwen 等模型，提供 REST API。
-
-   使用方式：
-   1. 安装：`brew install ollama`（macOS）或参考官网
-   2. 启动服务：`ollama serve`（默认监听 http://localhost:11434）
-   3. 拉取模型：`ollama pull gemma3:27b`
-   4. 对话端点：`POST http://localhost:11434/api/chat`，请求体：`{"model":"gemma3:27b","messages":[...],"stream":false}`
-   5. 嵌入端点：`POST http://localhost:11434/api/embeddings`，请求体：`{"model":"nomic-embed-text","prompt":"..."}`
-
-   本项目中通过 `LLMService` 封装，`llm_provider=ollama` 时自动路由到本地 Ollama 实例。
 4. LLMProviderError应该在什么情况下出现
-   **[AI回答]**
-   以下情况抛出 `LLMProviderError`：
-   - HTTP 5xx 响应（服务端错误），经重试 3 次仍失败后
-   - HTTP 429（速率限制/超出配额），不重试，直接抛出
-   - `httpx.TimeoutException`（请求超时），重试后仍失败
-   - `httpx.RequestError`（连接失败、DNS 解析失败等），重试后仍失败
-   - HTTP 4xx（除 429 外，如 401 未授权、400 请求格式错误），不重试，直接抛出
-
-   异常携带：`provider`（"openrouter"/"ollama"）、`status_code`（HTTP 状态码或 None）、`payload`（响应体原文）、`request_id`（关联日志追踪）。
 5. LLMOutputValidationError应该在什么情况下出现
-   **[AI回答]**
-   `LLMOutputValidationError` 在以下情况下抛出：
-   - LLM 返回了 HTTP 200，但响应内容无法被解析为预期的结构化格式（如调用方期望 JSON 但 LLM 返回了 Markdown）
-   - Pydantic 模型验证失败（字段缺失、类型不匹配等）
-
-   注意与 `LLMProviderError` 的区别：`LLMProviderError` 表示传输层/提供商层面的失败（LLM 没有正常返回）；`LLMOutputValidationError` 表示 LLM 正常返回但**内容**不符合预期格式。
-
-   本任务中只定义此异常类，在 Task 4 中实际使用。
 6. 是否有多线程的场景，如果有，如何让request_id能够跨线程获取
-   **[AI回答]**
-   本项目使用 FastAPI + asyncio，主要并发模型是**单线程异步**（协程），不是多线程。
-
-   `contextvars.ContextVar` 在 asyncio 中天然支持：每个异步任务（`asyncio.Task`）有独立的 context 副本，`request_id` 绑定后在同一个请求的所有 `await` 调用链中自动可见，无需手动传递。
-
-   但以下场景需注意：
-   - `asyncio.create_task()` 会复制父任务的 context（Python 3.7+），子任务可见父任务绑定的 `request_id`，✅ 安全
-   - `loop.run_in_executor()`（将同步代码扔到线程池）中，ContextVar **不会自动传播**到工作线程。如果有此场景，需手动在 executor callable 中重新绑定 `request_id`
-   - 本任务不涉及 `run_in_executor`，暂不需要处理
 7. Python的单例，容器是借助啥实现的，实现原理是啥？
-   **[AI回答]**
-   本项目中的两种"单例"机制：
-
-   **1. `@lru_cache` 实现 Settings 单例**
-   ```python
-   from functools import lru_cache
-   @lru_cache
-   def get_settings() -> Settings:
-       return Settings()
-   ```
-   原理：`lru_cache` 缓存函数的返回值，无参函数只会执行一次，后续调用返回同一对象。
-   测试重置：`get_settings.cache_clear()` 清除缓存，下次调用重新初始化。
-
-   **2. FastAPI `lifespan` 实现 ServicesContainer 单例**
-   ```python
-   @asynccontextmanager
-   async def lifespan(app: FastAPI):
-       container = ServicesContainer(settings=get_settings(), llm=LLMService(...))
-       app.state.container = container  # 挂载到 app.state
-       yield
-       # 清理资源
-   ```
-   原理：`lifespan` 在应用启动时执行一次，将 `ServicesContainer` 实例挂载到 `app.state`；每个请求通过依赖注入 `Request.app.state.container` 获取同一实例。
-
-   这是**构造函数 DI**（依赖注入）而非传统单例模式，便于测试（测试可替换 `app.state.container`）。
 8. 日志中，出现截断的提示词，是否应该在某个地方进行
-   **[AI回答]**
-   当前阶段的决策：**不做全量存储**，截断到 500 字符 + `_truncated: true` 标记。
-
-   原因：
-   1. 提示词可能包含用户隐私数据，全量存储需要额外的数据脱敏和访问控制，超出本任务范围
-   2. 全量提示词可能很大（数 KB），写入日志会显著增加存储成本
-
-   如果后续需要全量调试：
-   - 可在 `DEBUG` 级别打完整提示词（生产不开启 DEBUG）
-   - 或引入专门的"提示词审计日志"（写入独立存储，有访问控制），在 Task 4/5 中根据需要添加
-   - `request_id` 贯穿全链路，可通过 `request_id` 关联重放请求
 
 
 ## 实现计划
 
-（等待用户批准后执行）
-
-### 前置准备
-
-- [ ] P0. 确认 `codebases/financial-agent-api/` 下无 `.env` 文件（不提交真实密钥）；创建 `.env.example`，内容含 `LLM_PROVIDER`、`LOG_FORMAT`、`OPENROUTER_API_KEY`（占位符）、`OPENROUTER_MODEL`、`OLLAMA_BASE_URL`、`OLLAMA_CHAT_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM` 等占位项
-
-### 阶段 1 — 基础配置与异常
-
-- [ ] 1.1 创建 `src/financial_agent_api/core/` 目录及 `__init__.py`
-- [ ] 1.2 实现 `src/financial_agent_api/core/config.py`
-  - `Settings(BaseSettings)` 包含本任务所需字段（不含 `pg_dsn`）
-  - `model_validator(mode="after")`：`llm_provider=openrouter` 时 `openrouter_api_key` 不能为 None，否则抛 `ValueError`
-  - `@lru_cache` 的 `get_settings()` 工厂函数
-- [ ] 1.3 实现 `src/financial_agent_api/core/exceptions.py`
-  - `LLMProviderError(Exception)`：字段 `provider: str`、`status_code: int | None`、`payload: str`、`request_id: str | None`；`__str__` 安全序列化
-  - `LLMOutputValidationError(Exception)`：字段 `raw_response: str`、`validation_error: str`
-- [ ] 1.4 编写 `tests/test_config.py`，覆盖：settings 正常加载、openrouter 缺 key 时 ValueError、ollama 模式下 key 可选
-
-### 阶段 2 — 结构化日志
-
-- [ ] 2.1 实现 `src/financial_agent_api/core/logging.py`
-  - `configure_logging(settings: Settings)` — 基于 `loguru`，根据 `log_format` 切换 JSON / 文本格式；JSON 格式 serialize=True，文本格式带颜色
-  - `bind_request_id(request_id: str)` — 将 `request_id` 写入 `contextvars.ContextVar`
-  - `get_request_id() -> str` — 读取 ContextVar，未绑定时返回 `"no-request-id"`
-  - loguru `record["extra"]` 注入：通过 `logger.configure(patcher=...)` 自动将 ContextVar 中的 `request_id` 注入每条日志
-- [ ] 2.2 编写 `tests/test_logging.py`，覆盖：JSON 格式时字段存在、request_id 正确注入、截断标记
-
-### 阶段 3 — HTTP 客户端与 LLMService
-
-- [ ] 3.1 创建 `src/financial_agent_api/services/` 目录及 `__init__.py`
-- [ ] 3.2 实现 `src/financial_agent_api/services/llm_client.py`
-  - `LLMHTTPClient` 封装 `httpx.AsyncClient`
-  - 构造函数：`base_url: str`、`api_key: str | None`、`timeout: float = 30.0`、`transport: httpx.AsyncBaseTransport | None = None`
-  - `async def post(path: str, json: dict) -> dict` — 在入口/出口打边界日志（截断 prompt 字段到 500 字符），返回 JSON；HTTP 错误直接透传给调用方处理
-  - `async def aclose()` — 关闭底层 client
-- [ ] 3.3 实现 `src/financial_agent_api/services/llm_service.py`
-  - `LLMService(settings, http_client)` 实现 `complete` 和 `embed`
-  - 可重试错误：`httpx.TimeoutException`、`httpx.RequestError`、HTTP 5xx；**不重试** 4xx（含 429）
-  - 重试策略：指数退避 + jitter，最多 3 次（基数 1s，上限 8s）；使用 `asyncio.sleep`
-  - 3 次后仍失败：抛 `LLMProviderError`
-  - `complete`：OpenRouter 路径 `/chat/completions`，Ollama 路径 `/api/chat`，返回 `str`
-  - `embed`：OpenRouter 路径 `/embeddings`，Ollama 路径 `/api/embeddings`（逐条调用后聚合），返回 `list[list[float]]`
-- [ ] 3.4 实现 `src/financial_agent_api/core/services_container.py`
-  - `@dataclass class ServicesContainer`：`settings: Settings`、`llm: LLMService`
-- [ ] 3.5 编写 `tests/test_llm_service.py`，覆盖：OpenRouter/Ollama 端点正确、重试 3 次后抛异常、embed 批量循环（Ollama）
-
-### 阶段 4 — 接入 main.py
-
-- [ ] 4.1 更新 `src/financial_agent_api/main.py`
-  - 添加 `lifespan`：启动时 `configure_logging`、构造 `ServicesContainer`、挂载到 `app.state`；关闭时 `await llm_client.aclose()`
-  - 添加 request-id 中间件：读取 `X-Request-Id` 请求头（存在则用，否则生成 UUID4）→ `bind_request_id` → 设置响应头 `X-Request-Id`
-  - 添加 `/readyz` 端点：返回 `{"status": "ok"}` 即可（后续任务扩展为真实健康检查）
-
-### 阶段 5 — 验证
-
-- [ ] 5.1 运行 `pytest tests/` 确保全绿
-- [ ] 5.2 运行 `ruff check src/ tests/`
-- [ ] 5.3 手动 `curl http://localhost:8000/healthz` 和 `curl http://localhost:8000/readyz` 验证
-- [ ] 5.4 手动验证 `python -c "from financial_agent_api.core.config import get_settings; print(get_settings().openrouter_model)"` 正常输出
-
-### 注意事项
-
-- 重试逻辑**仅在 `LLMService` 内部**，禁止调用方再包重试（避免嵌套，见风险 8）
-- `OPENROUTER_API_KEY` 不得出现在任何日志中（`llm_client.py` 的边界日志需排除 headers）
-- 所有新函数加类型标注
+TODO AI生成实现计划，由用户批准通过后，按计划执行

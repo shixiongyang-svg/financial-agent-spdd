@@ -13,8 +13,6 @@
 > to the destination version).
 > **Unblocks:** `Task_2_Ingestion.trainee.md`, `Task_3_Orchestration.trainee.md`.
 
-**✅ Status: Approved**
-
 ---
 
 ## Requirements
