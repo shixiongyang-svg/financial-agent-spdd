@@ -1,9 +1,49 @@
 """Financial Helpdesk Agent — FastAPI application entry point."""
 
-from fastapi import FastAPI
+from __future__ import annotations
+
+import logging
+import time
+from contextlib import asynccontextmanager
+from typing import AsyncIterator, Awaitable, Callable
+from uuid import uuid4
+
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Financial Helpdesk Agent", version="0.0.0")
+from .core.config import get_settings
+from .core.logging import bind_request_id, configure_logging, reset_request_id
+from .core.services_container import ServicesContainer
+from .services.llm_client import LLMHTTPClient
+from .services.llm_service import LLMService
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    configure_logging(settings.log_format)
+
+    if settings.llm_provider == "openrouter":
+        http_client = LLMHTTPClient(
+            base_url=settings.openrouter_base_url,
+            api_key=settings.openrouter_api_key,
+        )
+    else:
+        http_client = LLMHTTPClient(base_url=settings.ollama_base_url)
+
+    app.state.container = ServicesContainer(
+        settings=settings,
+        llm=LLMService(settings=settings, http_client=http_client),
+    )
+    try:
+        yield
+    finally:
+        await http_client.close()
+
+
+app = FastAPI(title="Financial Helpdesk Agent", version="0.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -13,6 +53,36 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def request_id_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    request_id = request.headers.get("X-Request-Id", str(uuid4()))
+    token = bind_request_id(request_id)
+    started_at = time.perf_counter()
+    try:
+        response = await call_next(request)
+    finally:
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 3)
+        logger.info(
+            "request_completed",
+            extra={
+                "path": request.url.path,
+                "method": request.method,
+                "duration_ms": duration_ms,
+            },
+        )
+        reset_request_id(token)
+    response.headers["X-Request-Id"] = request_id
+    return response
+
+
 @app.get("/healthz")
-def healthz() -> dict[str, str]:
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz() -> dict[str, str]:
     return {"status": "ok"}
