@@ -69,6 +69,34 @@ curl -fsS http://financial-agent-api.localhost.com/healthz
 docker compose exec financial-agent-api uv run pytest tests/ -v
 ```
 
+## 本地开发
+
+### API 基础设施环境变量
+
+后端位于 `codebases/financial-agent-api`，可复制 `.env.example` 为 `.env` 后本地运行：
+
+```bash
+cd codebases/financial-agent-api
+cp .env.example .env
+uv sync --dev
+uv run uvicorn financial_agent_api.main:app --app-dir src --reload
+```
+
+关键变量：
+
+- `LLM_PROVIDER=ollama|openrouter`
+- `LOG_FORMAT=text|json`
+- `OPENROUTER_API_KEY`：仅在 `LLM_PROVIDER=openrouter` 时必填
+- `OPENROUTER_MODEL`、`OLLAMA_CHAT_MODEL`、`OLLAMA_OPS_MODEL`：分别控制默认模型
+
+验证示例：
+
+```bash
+cd codebases/financial-agent-api
+uv run python -c "from financial_agent_api.core.config import get_settings; print(get_settings().openrouter_model)"
+uv run curl -fsS http://127.0.0.1:8000/readyz
+```
+
 ## Development
 
 - **Runtime:** Python 3.11+
