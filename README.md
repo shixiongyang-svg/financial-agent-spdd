@@ -8,7 +8,18 @@ and operates safely under explicit guardrails.
 ## Quickstart
 
 ```bash
-# Start all services
+# First run: interactive provider/config setup, then start services
+./start
+```
+
+Behavior of `./start`:
+
+- **First run** (no `./.local-config/llm.env`): asks you to choose provider (`ollama` or `openrouter`) and input required values, then saves them to `./.local-config/llm.env`.
+- **Subsequent runs**: no prompts; reuses the saved config automatically.
+- **Reset config**: delete local config directory and run again:
+
+```bash
+rm -rf ./.local-config
 ./start
 ```
 
@@ -88,6 +99,37 @@ uv run uvicorn financial_agent_api.main:app --app-dir src --reload
 - `LOG_FORMAT=text|json`
 - `OPENROUTER_API_KEY`：仅在 `LLM_PROVIDER=openrouter` 时必填
 - `OPENROUTER_MODEL`、`OLLAMA_CHAT_MODEL`、`OLLAMA_OPS_MODEL`：分别控制默认模型
+- `COMPLAINTS_CSV_PATH`、`DOCS_SOURCE_DIR`：容器内固定为 `/app/data/...`
+
+### 交互式本地配置（推荐）
+
+本项目默认通过根目录 `./start` 进行交互式配置并启动：
+
+1. 首次运行会创建 `./.local-config/llm.env`（本地私有，不提交）。
+2. 你只需按提示选择模型并输入必要参数。
+3. 第二次运行起直接复用，不再询问。
+
+交互时会根据模型提供商要求不同变量：
+
+- Ollama：`OLLAMA_BASE_URL`、`OLLAMA_CHAT_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM`
+- OpenRouter：`OPENROUTER_API_KEY`、`OPENROUTER_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM`
+
+### OpenRouter 免费模型快速验证脚本
+
+根目录提供了一个脚本，可自动拉取模型目录并完成两段验证：
+1) 从 `output_modalities=text` 列表里选择可用 `:free` 聊天模型做对话测试；2) 从 `output_modalities=embeddings` 列表里探测可用 embedding 模型并识别向量维度。遇到 429 会按 `Retry-After` 重试，但会限制等待上限并快速切换候选模型，避免卡太久。
+
+```bash
+python scripts/openrouter_free_smoke.py
+```
+
+脚本流程：
+
+1. 输入 `OPENROUTER_API_KEY`（隐藏输入）
+2. 拉取当前可用 `:free` 聊天模型并自动优先挑选常见模型
+3. 使用脚本内置测试消息自动验证聊天返回（无需手动输入）
+4. 自动验证一个可用 `EMBEDDING_MODEL` 并检测 `EMBEDDING_DIM`
+5. 输出可直接粘贴的推荐环境变量：`OPENROUTER_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM`
 
 验证示例：
 

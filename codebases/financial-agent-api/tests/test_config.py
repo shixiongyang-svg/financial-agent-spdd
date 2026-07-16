@@ -25,6 +25,11 @@ def clear_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "OLLAMA_BASE_URL",
         "OLLAMA_CHAT_MODEL",
         "OLLAMA_OPS_MODEL",
+        "DATABASE_URL",
+        "EMBEDDING_MODEL",
+        "EMBEDDING_DIM",
+        "COMPLAINTS_CSV_PATH",
+        "DOCS_SOURCE_DIR",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -40,6 +45,11 @@ def test_settings_defaults() -> None:
     assert settings.ollama_base_url == "http://localhost:11434"
     assert settings.ollama_chat_model == "gemma3:27b"
     assert settings.ollama_ops_model == "qwen3.5:4b"
+    assert settings.database_url == "postgresql+psycopg://app:app@localhost:5432/app"
+    assert settings.embedding_model == "nomic-embed-text"
+    assert settings.embedding_dim == 768
+    assert settings.complaints_csv_path is None
+    assert settings.docs_source_dir is None
 
 
 def test_openrouter_requires_api_key() -> None:
@@ -71,3 +81,11 @@ def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     get_settings.cache_clear()
     refreshed = get_settings()
     assert refreshed.openrouter_model == "second-model"
+
+
+def test_required_paths_raise_when_missing() -> None:
+    settings = Settings()
+    with pytest.raises(ValueError, match="COMPLAINTS_CSV_PATH is required"):
+        settings.require_complaints_csv_path()
+    with pytest.raises(ValueError, match="DOCS_SOURCE_DIR is required"):
+        settings.require_docs_source_dir()

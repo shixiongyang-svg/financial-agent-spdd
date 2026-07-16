@@ -18,6 +18,9 @@ RUN uv sync --frozen
 # Copy application source and tests
 COPY src/ ./src/
 COPY tests/ ./tests/
+COPY scripts/ ./scripts/
+
+RUN chmod +x ./scripts/start_api.sh
 
 # Ensure appuser owns the app directory and home
 RUN chown -R appuser:appuser /app /home/appuser
@@ -26,4 +29,4 @@ RUN chown -R appuser:appuser /app /home/appuser
 USER appuser
 ENV UV_CACHE_DIR=/home/appuser/.cache/uv
 
-CMD ["uv", "run", "uvicorn", "financial_agent_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./scripts/start_api.sh"]

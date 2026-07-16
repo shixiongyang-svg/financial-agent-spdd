@@ -7,6 +7,14 @@ services:
     depends_on:
       financial-agent-db:
         condition: service_healthy
+    env_file:
+      - ./.local-config/llm.env
+    environment:
+      COMPLAINTS_CSV_PATH: /app/data/complaints/complaints.csv
+      DOCS_SOURCE_DIR: /app/data/docs
+      DATABASE_URL: postgresql+psycopg://app:app@financial-agent-db:5432/app
+    volumes:
+      - ./data:/app/data:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
       interval: 5s
@@ -28,7 +36,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./.local-data/postgres:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
@@ -66,9 +74,6 @@ services:
         condition: service_healthy
     networks:
       - financial-agent-network
-
-volumes:
-  db_data:
 
 networks:
   financial-agent-network:
