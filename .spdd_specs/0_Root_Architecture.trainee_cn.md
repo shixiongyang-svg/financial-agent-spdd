@@ -361,6 +361,14 @@ financial-agent-spdd/
 │   │   │               ├── scenario_extraction.j2
 │   │   │               ├── next_steps.j2
 │   │   │               └── safety_classification.j2
+│   │   │       ├── db/
+│   │   │       │   ├── schema.py
+│   │   │       │   └── schema/
+│   │   │       │       └── 0001_create_tables.sql
+│   │   │       └── scripts/
+│   │   │           ├── ingest_public_data.py
+│   │   │           ├── embed_starter_docs.py
+│   │   │           └── initialize_data.py
 │   │   ├── services/
 │   │   │   ├── llm_client.py
 │   │   │   ├── llm_service.py
@@ -392,7 +400,9 @@ financial-agent-spdd/
 │       ├── nginx.conf
 │       ├── financial-agent-api.localhost.com.conf
 │       └── financial-agent-ui.localhost.com.conf
-├── data/                                 # ← 已填充
+├── data/                                 # 本地语料目录（挂载到 API 容器）
+│   ├── complaints/                       # CSV 输入（COMPLAINTS_CSV_PATH -> /app/data/complaints/...）
+│   ├── docs/                             # Markdown 语料（DOCS_SOURCE_DIR -> /app/data/docs）
 │   ├── raw_docs/                         # 3 个清洗后的 CFPB Q&A .txt 文件
 │   └── samples/                          # complaints_sample.csv
 ├── data_pipelines/                       # ← 已部分填充
