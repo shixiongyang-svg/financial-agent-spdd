@@ -12,10 +12,12 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import get_settings
+from .core.database import create_engine_from_settings, create_session_factory
 from .core.logging import bind_request_id, configure_logging, reset_request_id
 from .core.services_container import ServicesContainer
 from .services.llm_client import LLMHTTPClient
 from .services.llm_service import LLMService
+from .services.retrieval_service import RetrievalService
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_format)
+    engine = create_engine_from_settings(settings)
+    session_factory = create_session_factory(engine)
 
     if settings.llm_provider == "openrouter":
         http_client = LLMHTTPClient(
@@ -33,14 +37,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         http_client = LLMHTTPClient(base_url=settings.ollama_base_url)
 
+    llm_service = LLMService(settings=settings, http_client=http_client)
     app.state.container = ServicesContainer(
         settings=settings,
-        llm=LLMService(settings=settings, http_client=http_client),
+        session_factory=session_factory,
+        llm=llm_service,
+        retrieval=RetrievalService(session_factory=session_factory, llm=llm_service),
     )
     try:
         yield
     finally:
         await http_client.close()
+        engine.dispose()
 
 
 app = FastAPI(title="Financial Helpdesk Agent", version="0.0.0", lifespan=lifespan)

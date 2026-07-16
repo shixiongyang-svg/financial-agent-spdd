@@ -105,8 +105,85 @@ class LLMService:
             raise LLMProviderError(provider=provider, status_code=None, payload="Unknown LLM error", request_id=effective_request_id)
         raise last_error
 
-    async def embed(self, *_: Any, **__: Any) -> list[float]:
-        raise NotImplementedError("Task 2 will implement embeddings")
+    async def embed(
+        self,
+        text_value: str,
+        *,
+        model: str | None = None,
+        request_id: str | None = None,
+    ) -> list[float]:
+        provider = self._settings.llm_provider
+        effective_request_id = get_request_id() or request_id
+        selected_model = model or self._settings.embedding_model
+        payload: dict[str, Any]
+        if provider == "openrouter":
+            payload = {"model": selected_model, "input": text_value}
+        else:
+            payload = {"model": selected_model, "prompt": text_value}
+
+        logger.info(
+            "llm_embed_start",
+            extra={
+                "provider": provider,
+                "model": selected_model,
+                "request_id": get_request_id(),
+                "payload": _truncate_for_log(payload),
+            },
+        )
+
+        attempts = 3
+        last_error: LLMProviderError | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                response = await self._http_client.request(
+                    method="POST",
+                    path=self._embedding_path_for_provider(provider),
+                    json=payload,
+                )
+            except (httpx.RequestError, httpx.TimeoutException) as exc:
+                last_error = LLMProviderError(
+                    provider=provider,
+                    status_code=None,
+                    payload=str(exc),
+                    request_id=effective_request_id,
+                )
+                if attempt == attempts:
+                    raise last_error from exc
+                await self._sleep_before_retry(attempt)
+                continue
+
+            status_code = int(response.get("_status_code", 500))
+            if 200 <= status_code < 300:
+                embedding = self._extract_embedding(provider, response, effective_request_id)
+                logger.info(
+                    "llm_embed_success",
+                    extra={
+                        "provider": provider,
+                        "model": selected_model,
+                        "request_id": get_request_id(),
+                        "embedding_dim": len(embedding),
+                    },
+                )
+                return embedding
+
+            last_error = LLMProviderError(
+                provider=provider,
+                status_code=status_code,
+                payload=self._response_payload(response),
+                request_id=effective_request_id,
+            )
+            if status_code == 429 or 400 <= status_code < 500:
+                raise last_error
+            if 500 <= status_code < 600:
+                if attempt == attempts:
+                    raise last_error
+                await self._sleep_before_retry(attempt)
+                continue
+            raise last_error
+
+        if last_error is None:
+            raise LLMProviderError(provider=provider, status_code=None, payload="Unknown embedding error", request_id=effective_request_id)
+        raise last_error
 
     def _build_payload(
         self,
@@ -141,6 +218,11 @@ class LLMService:
         if provider == "openrouter":
             return "/chat/completions"
         return "/api/chat"
+
+    def _embedding_path_for_provider(self, provider: str) -> str:
+        if provider == "openrouter":
+            return "/embeddings"
+        return "/api/embeddings"
 
     def _extract_content(
         self,
@@ -187,6 +269,31 @@ class LLMService:
             return json.dumps(response, ensure_ascii=False)
         except (TypeError, ValueError):
             return str(response)
+
+    def _extract_embedding(
+        self,
+        provider: str,
+        response: dict[str, Any],
+        request_id: str | None,
+    ) -> list[float]:
+        if provider == "openrouter":
+            data = response.get("data")
+            if isinstance(data, list) and data:
+                first = data[0]
+                if isinstance(first, dict):
+                    embedding = first.get("embedding")
+                    if isinstance(embedding, list):
+                        return [float(value) for value in embedding]
+        else:
+            embedding = response.get("embedding")
+            if isinstance(embedding, list):
+                return [float(value) for value in embedding]
+        raise LLMProviderError(
+            provider=provider,
+            status_code=int(response.get("_status_code", 200)),
+            payload=self._response_payload(response),
+            request_id=request_id,
+        )
 
 
 def _truncate_for_log(payload: dict[str, Any]) -> dict[str, Any]:

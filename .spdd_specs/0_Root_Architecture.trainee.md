@@ -380,6 +380,14 @@ financial-agent-spdd/
 │   │   │               ├── scenario_extraction.j2
 │   │   │               ├── next_steps.j2
 │   │   │               └── safety_classification.j2
+│   │   │       ├── db/
+│   │   │       │   ├── schema.py
+│   │   │       │   └── schema/
+│   │   │       │       └── 0001_create_tables.sql
+│   │   │       └── scripts/
+│   │   │           ├── ingest_public_data.py
+│   │   │           ├── embed_starter_docs.py
+│   │   │           └── initialize_data.py
 │   │   ├── services/
 │   │   │   ├── llm_client.py
 │   │   │   ├── llm_service.py
@@ -411,7 +419,9 @@ financial-agent-spdd/
 │       ├── nginx.conf
 │       ├── financial-agent-api.localhost.com.conf
 │       └── financial-agent-ui.localhost.com.conf
-├── data/                                 # ← already populated
+├── data/                                 # local corpus mounted to API container
+│   ├── complaints/                       # CSV inputs (COMPLAINTS_CSV_PATH -> /app/data/complaints/...)
+│   ├── docs/                             # markdown corpus (DOCS_SOURCE_DIR -> /app/data/docs)
 │   ├── raw_docs/                         # 3 cleaned CFPB Q&A .txt files
 │   └── samples/                          # complaints_sample.csv
 ├── data_pipelines/                       # ← already partially populated

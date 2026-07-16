@@ -6,11 +6,132 @@
 #
 set -euo pipefail
 
+CONFIG_DIR="./.local-config"
+CONFIG_FILE="${CONFIG_DIR}/llm.env"
+
 HOSTS_FILE="/etc/hosts"
 HOSTS_ENTRIES=(
     "127.0.0.1 financial-agent-ui.localhost.com"
     "127.0.0.1 financial-agent-api.localhost.com"
 )
+
+ensure_non_empty() {
+    local prompt="$1"
+    local default_value="${2:-}"
+    local secret="${3:-false}"
+    local answer
+
+    while true; do
+        if [ "${secret}" = "true" ]; then
+            read -r -s -p "${prompt}: " answer
+            printf '\n' >&2
+        elif [ -n "${default_value}" ]; then
+            read -r -p "${prompt} [default: ${default_value}]: " answer
+        else
+            read -r -p "${prompt}: " answer
+        fi
+
+        if [ -z "${answer}" ] && [ -n "${default_value}" ]; then
+            answer="${default_value}"
+        fi
+
+        if [ -n "${answer}" ]; then
+            printf '%s' "${answer}"
+            return 0
+        fi
+        echo "Value cannot be empty. Please try again." >&2
+    done
+}
+
+guess_embedding_dim_default() {
+    local model="$1"
+    case "${model}" in
+        openai/text-embedding-3-small) echo "1536" ;;
+        openai/text-embedding-3-large) echo "3072" ;;
+        nomic-embed-text) echo "768" ;;
+        *) echo "768" ;;
+    esac
+}
+
+bootstrap_llm_config() {
+    if [ -f "${CONFIG_FILE}" ]; then
+        echo "Using existing config: ${CONFIG_FILE}"
+        echo "If you need to reconfigure, delete ${CONFIG_DIR} and run ./start again."
+        return 0
+    fi
+
+    if [ ! -t 0 ]; then
+        echo "Missing ${CONFIG_FILE} and no interactive terminal is available." >&2
+        echo "Run ./start in an interactive shell to create configuration." >&2
+        exit 1
+    fi
+
+    mkdir -p "${CONFIG_DIR}"
+    echo "No local LLM config found. Starting interactive setup..."
+    echo "Select provider:"
+    echo "  1) Ollama (local)"
+    echo "  2) OpenRouter (cloud)"
+
+    local provider_choice provider
+    while true; do
+        read -r -p "Enter choice [1/2]: " provider_choice
+        case "${provider_choice}" in
+            1) provider="ollama"; break ;;
+            2) provider="openrouter"; break ;;
+            *) echo "Invalid choice. Please enter 1 or 2." ;;
+        esac
+    done
+
+    local llm_provider log_format
+    local openrouter_api_key openrouter_base_url openrouter_model
+    local ollama_base_url ollama_chat_model ollama_ops_model
+    local database_url embedding_model embedding_dim
+    local complaints_csv_path docs_source_dir
+
+    llm_provider="${provider}"
+    log_format="text"
+    openrouter_base_url="https://openrouter.ai/api/v1"
+    ollama_ops_model="qwen3.5:4b"
+    database_url="postgresql+psycopg://app:app@financial-agent-db:5432/app"
+    embedding_dim=""
+    complaints_csv_path="/app/data/complaints/complaints.csv"
+    docs_source_dir="/app/data/docs"
+
+    if [ "${provider}" = "ollama" ]; then
+        ollama_base_url="$(ensure_non_empty "OLLAMA_BASE_URL" "http://host.docker.internal:11434")"
+        ollama_chat_model="$(ensure_non_empty "OLLAMA_CHAT_MODEL" "gemma3:27b")"
+        embedding_model="$(ensure_non_empty "EMBEDDING_MODEL" "nomic-embed-text")"
+        embedding_dim="$(ensure_non_empty "EMBEDDING_DIM" "$(guess_embedding_dim_default "${embedding_model}")")"
+        openrouter_api_key=""
+        openrouter_model="gpt-4.1-mini"
+    else
+        openrouter_api_key="$(ensure_non_empty "OPENROUTER_API_KEY" "" "true")"
+        openrouter_model="$(ensure_non_empty "OPENROUTER_MODEL" "gpt-4.1-mini")"
+        embedding_model="$(ensure_non_empty "EMBEDDING_MODEL" "openai/text-embedding-3-small")"
+        embedding_dim="$(ensure_non_empty "EMBEDDING_DIM" "$(guess_embedding_dim_default "${embedding_model}")")"
+        ollama_base_url="http://host.docker.internal:11434"
+        ollama_chat_model="gemma3:27b"
+    fi
+
+    cat > "${CONFIG_FILE}" <<EOF
+LLM_PROVIDER=${llm_provider}
+LOG_FORMAT=${log_format}
+OPENROUTER_API_KEY=${openrouter_api_key}
+OPENROUTER_BASE_URL=${openrouter_base_url}
+OPENROUTER_MODEL=${openrouter_model}
+OLLAMA_BASE_URL=${ollama_base_url}
+OLLAMA_CHAT_MODEL=${ollama_chat_model}
+OLLAMA_OPS_MODEL=${ollama_ops_model}
+DATABASE_URL=${database_url}
+EMBEDDING_MODEL=${embedding_model}
+EMBEDDING_DIM=${embedding_dim}
+COMPLAINTS_CSV_PATH=${complaints_csv_path}
+DOCS_SOURCE_DIR=${docs_source_dir}
+EOF
+    chmod 600 "${CONFIG_FILE}"
+    echo "Saved interactive configuration to ${CONFIG_FILE}"
+    echo "Future runs will reuse this file without prompting."
+}
 
 missing_entries=()
 for entry in "${HOSTS_ENTRIES[@]}"; do
@@ -42,6 +163,8 @@ if [ ${#missing_entries[@]} -gt 0 ]; then
     echo "Hosts entries added successfully."
     echo ""
 fi
+
+bootstrap_llm_config
 
 echo "Starting Financial Helpdesk Agent services..."
 docker compose up --build -d

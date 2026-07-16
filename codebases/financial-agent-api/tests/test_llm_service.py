@@ -32,6 +32,11 @@ def clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "OLLAMA_BASE_URL",
         "OLLAMA_CHAT_MODEL",
         "OLLAMA_OPS_MODEL",
+        "DATABASE_URL",
+        "EMBEDDING_MODEL",
+        "EMBEDDING_DIM",
+        "COMPLAINTS_CSV_PATH",
+        "DOCS_SOURCE_DIR",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -210,13 +215,20 @@ async def test_complete_raises_on_invalid_success_payload() -> None:
 
 
 @pytest.mark.asyncio
-async def test_embed_is_stub() -> None:
+async def test_embed_uses_ollama_endpoint() -> None:
     settings = Settings()
-    client = LLMHTTPClient(settings.ollama_base_url, transport=httpx.MockTransport(lambda _: httpx.Response(200, json={})))
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "http://localhost:11434/api/embeddings"
+        body = json.loads(request.content.decode())
+        assert body["model"] == "nomic-embed-text"
+        assert body["prompt"] == "hello"
+        return httpx.Response(200, json={"embedding": [0.1, 0.2, 0.3]})
+
+    client = LLMHTTPClient(settings.ollama_base_url, transport=httpx.MockTransport(handler))
     service = LLMService(settings=settings, http_client=client)
 
-    with pytest.raises(NotImplementedError, match="Task 2"):
-        await service.embed("hello")
+    embedding = await service.embed("hello")
+    assert embedding == [0.1, 0.2, 0.3]
 
     await client.close()
 
