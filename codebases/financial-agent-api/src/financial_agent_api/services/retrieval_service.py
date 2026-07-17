@@ -78,9 +78,11 @@ class RetrievalService:
                 "product": product,
             },
         )
-        params: dict[str, str | int | None] = {
+        product_pattern = f"%{product}%" if product else "%"
+        params: dict[str, str | int | bool] = {
             "query_pattern": f"%{query}%",
-            "product_pattern": f"%{product}%" if product else None,
+            "product_pattern": product_pattern,
+            "product_filter_enabled": bool(product),
             "limit": limit,
         }
         sql = text(
@@ -95,7 +97,7 @@ class RetrievalService:
               submitted_via,
               narrative
             FROM complaints
-            WHERE (:product_pattern IS NULL OR product ILIKE :product_pattern)
+            WHERE (:product_filter_enabled = FALSE OR product ILIKE :product_pattern)
               AND (
                 issue ILIKE :query_pattern
                 OR company ILIKE :query_pattern
