@@ -169,9 +169,31 @@ bootstrap_llm_config
 echo "Starting Financial Helpdesk Agent services..."
 docker compose up --build -d
 
+echo "Running one-time API health check..."
+API_HEALTH_URL="http://financial-agent-api.localhost.com/healthz"
+HEALTH_TIMEOUT_SECONDS=60
+HEALTH_INTERVAL_SECONDS=2
+elapsed=0
+
+while true; do
+    if curl -fsS "${API_HEALTH_URL}" > /dev/null; then
+        echo "API health check passed."
+        break
+    fi
+
+    if [ "${elapsed}" -ge "${HEALTH_TIMEOUT_SECONDS}" ]; then
+        echo "ERROR: API did not become healthy within ${HEALTH_TIMEOUT_SECONDS}s." >&2
+        echo "Check logs with: docker compose logs --tail=100 financial-agent-api" >&2
+        exit 1
+    fi
+
+    sleep "${HEALTH_INTERVAL_SECONDS}"
+    elapsed=$((elapsed + HEALTH_INTERVAL_SECONDS))
+done
+
 echo ""
 echo "============================================"
-echo "  Services started (Docker manages health)."
+echo "  Services started."
 echo "============================================"
 echo ""
 echo "  UI:  http://financial-agent-ui.localhost.com"

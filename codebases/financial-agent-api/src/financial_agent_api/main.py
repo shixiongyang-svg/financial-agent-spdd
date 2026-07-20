@@ -11,6 +11,8 @@ from uuid import uuid4
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from .agent.runner import AgentRunner
+from .routers.agent import router as agent_router
 from .core.config import get_settings
 from .core.database import create_engine_from_settings, create_session_factory
 from .core.logging import bind_request_id, configure_logging, reset_request_id
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         llm=llm_service,
         retrieval=RetrievalService(session_factory=session_factory, llm=llm_service),
     )
+    app.state.runner = AgentRunner(app.state.container)
     try:
         yield
     finally:
@@ -52,6 +55,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Financial Helpdesk Agent", version="0.0.0", lifespan=lifespan)
+
+app.include_router(agent_router)
 
 app.add_middleware(
     CORSMiddleware,

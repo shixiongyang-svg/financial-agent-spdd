@@ -15,11 +15,6 @@ services:
       DATABASE_URL: postgresql+psycopg://app:app@financial-agent-db:5432/app
     volumes:
       - ./data:/app/data:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
     networks:
       - financial-agent-network
 
@@ -49,11 +44,14 @@ services:
       dockerfile: ../../support/financial-agent-ui/Dockerfile
     depends_on:
       financial-agent-api:
-        condition: service_healthy
+        condition: service_started
+    volumes:
+      - ./codebases/financial-agent-ui/public:/app/public
+      - ./codebases/financial-agent-ui/src:/app/src
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000 || exit 1"]
       interval: 5s
-      timeout: 5s
+      timeout: 60s
       retries: 10
     networks:
       - financial-agent-network
@@ -69,7 +67,7 @@ services:
       - "80:80"
     depends_on:
       financial-agent-api:
-        condition: service_healthy
+        condition: service_started
       financial-agent-ui:
         condition: service_healthy
     networks:
