@@ -45,6 +45,7 @@
       border-radius: 8px;
       padding: 20px;
       margin-top: 24px;
+      text-align: left;
     }
     .status-label {
       font-size: 14px;
@@ -87,6 +88,65 @@
       color: #9ca3af;
       font-style: italic;
     }
+    .query-card {
+      margin-top: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .query-label {
+      font-size: 14px;
+      color: #374151;
+      margin-bottom: 8px;
+      display: block;
+      font-weight: 600;
+    }
+    .query-input {
+      width: 100%;
+      min-height: 84px;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+    }
+    .query-actions {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .query-btn {
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 14px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .query-btn[disabled] {
+      background: #93c5fd;
+      cursor: not-allowed;
+    }
+    .query-meta {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .answer-card {
+      margin-top: 12px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+      text-align: left;
+      font-size: 14px;
+      color: #111827;
+    }
   </style>
 </head>
 <body>
@@ -103,11 +163,22 @@
       <div class="api-response" id="api-response">
         <span class="loading">Connecting to financial-agent-api...</span>
       </div>
+
+      <div class="query-card">
+        <label for="question-input" class="query-label">Ask the agent</label>
+        <textarea id="question-input" class="query-input">What is an overdraft fee?</textarea>
+        <div class="query-actions">
+          <button id="ask-btn" class="query-btn" type="button">Send</button>
+          <span class="query-meta" id="query-meta">POST /agent/query</span>
+        </div>
+        <div class="answer-card" id="answer-box">No answer yet.</div>
+      </div>
     </div>
   </div>
 
   <script>
     const API_HEALTHZ_URL = 'http://financial-agent-api.localhost.com/healthz';
+    const API_QUERY_URL = 'http://financial-agent-api.localhost.com/agent/query';
 
     async function checkHealth() {
       const dot = document.getElementById('status-dot');
@@ -140,6 +211,54 @@
       }
     }
 
+    async function askAgent() {
+      const askBtn = document.getElementById('ask-btn');
+      const questionInput = document.getElementById('question-input');
+      const answerBox = document.getElementById('answer-box');
+      const queryMeta = document.getElementById('query-meta');
+      const question = questionInput.value.trim();
+
+      if (!question) {
+        answerBox.textContent = 'Question cannot be empty.';
+        return;
+      }
+
+      askBtn.disabled = true;
+      queryMeta.textContent = 'Sending request...';
+      answerBox.textContent = 'Loading...';
+
+      try {
+        const response = await fetch(API_QUERY_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            question,
+            session_id: 'ui-session',
+            conversation_history: [],
+          }),
+        });
+
+        const data = await response.json();
+        const reqId = data.request_id || response.headers.get('X-Request-Id') || '-';
+        queryMeta.textContent = 'request_id: ' + reqId + ' | status: ' + response.status;
+
+        if (!response.ok) {
+          answerBox.textContent = (data && data.message) ? data.message : 'Request failed.';
+          return;
+        }
+
+        answerBox.textContent = data.answer || '(empty answer)';
+      } catch (err) {
+        queryMeta.textContent = 'Request failed';
+        answerBox.textContent = 'Network error: ' + err.message;
+      } finally {
+        askBtn.disabled = false;
+      }
+    }
+
+    document.getElementById('ask-btn').addEventListener('click', askAgent);
     checkHealth();
   </script>
 </body>

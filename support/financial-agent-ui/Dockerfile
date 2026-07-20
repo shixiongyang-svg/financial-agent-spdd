@@ -20,4 +20,4 @@ USER appuser
 
 EXPOSE 3000
 
-CMD ["npx", "serve", "public", "-l", "3000"]
+CMD ["npm", "run", "dev"]
