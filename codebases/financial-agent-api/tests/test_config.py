@@ -19,12 +19,17 @@ def clear_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for key in (
         "LLM_PROVIDER",
         "LOG_FORMAT",
+        "DEBUG",
         "OPENROUTER_API_KEY",
         "OPENROUTER_BASE_URL",
         "OPENROUTER_MODEL",
         "OLLAMA_BASE_URL",
         "OLLAMA_CHAT_MODEL",
         "OLLAMA_OPS_MODEL",
+        "COMPRESS_THRESHOLD",
+        "COMPRESS_OPS_MODEL",
+        "COMPRESS_CONFIDENCE_THRESHOLD",
+        "SCENARIO_CONFIDENCE_THRESHOLD",
         "DATABASE_URL",
         "EMBEDDING_MODEL",
         "EMBEDDING_DIM",
@@ -39,13 +44,18 @@ def test_settings_defaults() -> None:
 
     assert settings.llm_provider == "ollama"
     assert settings.log_format == "text"
+    assert settings.debug is False
     assert settings.openrouter_api_key is None
     assert settings.openrouter_base_url == "https://openrouter.ai/api/v1"
     assert settings.openrouter_model == "gpt-4.1-mini"
     assert settings.ollama_base_url == "http://localhost:11434"
     assert settings.ollama_chat_model == "gemma3:27b"
     assert settings.ollama_ops_model == "qwen3.5:4b"
-    assert settings.database_url == "postgresql+psycopg://app:app@localhost:5432/app"
+    assert settings.compress_threshold == 5
+    assert settings.compress_ops_model == "qwen3.5:4b"
+    assert settings.compress_confidence_threshold == 0.7
+    assert settings.scenario_confidence_threshold == 0.75
+    assert settings.database_url == "postgresql+psycopg://app:app@localhost:54321/app"
     assert settings.embedding_model == "nomic-embed-text"
     assert settings.embedding_dim == 768
     assert settings.complaints_csv_path is None
@@ -61,12 +71,22 @@ def test_openrouter_with_api_key_is_valid(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("LLM_PROVIDER", "openrouter")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setenv("LOG_FORMAT", "json")
+    monkeypatch.setenv("DEBUG", "true")
 
     settings = get_settings()
 
     assert settings.llm_provider == "openrouter"
     assert settings.openrouter_api_key == "test-key"
     assert settings.log_format == "json"
+    assert settings.debug is True
+
+
+def test_compress_ops_model_can_be_overridden(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COMPRESS_OPS_MODEL", "custom-compress-model")
+
+    settings = Settings()
+
+    assert settings.compress_ops_model == "custom-compress-model"
 
 
 def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:

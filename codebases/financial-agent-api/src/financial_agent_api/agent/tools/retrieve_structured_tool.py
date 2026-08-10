@@ -9,14 +9,15 @@ logger = logging.getLogger(__name__)
 async def retrieve_structured_tool(
     state: AgentState,
     retrieval: RetrievalService,
+    *,
+    product: str | None = None,
+    issue: str | None = None,
 ) -> dict:
     """Retrieve complaint rows relevant to the user query. Returns partial AgentState dict."""
-    try:
-        complaints = await retrieval.retrieve_complaints(
-            state["user_query"],
-            request_id=state["request_id"],
-        )
-        return {"structured_results": complaints}
-    except Exception as exc:
-        logger.warning("retrieve_structured_tool failed", extra={"error": str(exc), "request_id": state["request_id"]})
-        return {"structured_results": [], "error": str(exc)}
+    complaints = await retrieval.retrieve_complaints(
+        state["user_query"],
+        product=product,
+        issue=issue,
+        request_id=state["request_id"],
+    )
+    return {"structured_results": complaints}

@@ -17,13 +17,18 @@ class Settings(BaseSettings):
 
     llm_provider: Literal["ollama", "openrouter"] = "ollama"
     log_format: Literal["json", "text"] = "text"
+    debug: bool = False
     openrouter_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "gpt-4.1-mini"
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "gemma3:27b"
     ollama_ops_model: str = "qwen3.5:4b"
-    database_url: str = "postgresql+psycopg://app:app@localhost:5432/app"
+    compress_threshold: int = Field(default=5, ge=1)
+    compress_ops_model: str = "qwen3.5:4b"
+    compress_confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    scenario_confidence_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    database_url: str = "postgresql+psycopg://app:app@localhost:54321/app"
     embedding_model: str = "nomic-embed-text"
     embedding_dim: int = Field(default=768, ge=1)
     complaints_csv_path: str | None = None

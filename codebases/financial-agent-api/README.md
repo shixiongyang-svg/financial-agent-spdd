@@ -272,7 +272,7 @@ Both endpoints return `{"status": "ok"}`.
 | `OLLAMA_BASE_URL`     | ❌        | `http://localhost:11434`       | Ollama endpoint                                             |
 | `OLLAMA_CHAT_MODEL`   | ❌        | `gemma3:27b`                   | Default Ollama chat model                                   |
 | `OLLAMA_OPS_MODEL`    | ❌        | `qwen3.5:4b`                   | Ollama ops/utility model                                    |
-| `DATABASE_URL`        | ❌        | `postgresql+psycopg://app:app@localhost:5432/app` | SQLAlchemy database URL |
+| `DATABASE_URL`        | ❌        | `postgresql+psycopg://app:app@localhost:54321/app` | SQLAlchemy database URL |
 | `EMBEDDING_MODEL`     | ❌        | `nomic-embed-text`             | Embedding model used by ingestion and retrieval             |
 | `EMBEDDING_DIM`       | ❌        | `768`                          | Embedding vector dimension used in schema                   |
 | `COMPLAINTS_CSV_PATH` | ✅**      | —                              | CSV source path for complaints ingestion                    |

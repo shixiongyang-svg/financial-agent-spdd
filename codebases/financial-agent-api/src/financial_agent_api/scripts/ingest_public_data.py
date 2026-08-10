@@ -9,6 +9,7 @@ from sqlalchemy import text
 from ..core.config import get_settings
 from ..core.database import create_engine_from_settings, create_session_factory
 from ..db.schema import apply_schema
+from ..services.product_issue_service import ProductIssueService
 
 
 def _pick(row: dict[str, str], *keys: str) -> str | None:
@@ -101,6 +102,9 @@ def run() -> dict[str, int]:
             }
             session.execute(upsert_sql, params)
             processed += 1
+
+    product_issue_service = ProductIssueService(session_factory)
+    product_issue_service.refresh_allowed_product_issue_map()
 
     engine.dispose()
     return {"processed": processed, "skipped": skipped}

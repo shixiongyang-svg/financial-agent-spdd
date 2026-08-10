@@ -16,10 +16,13 @@ from .routers.agent import router as agent_router
 from .core.config import get_settings
 from .core.database import create_engine_from_settings, create_session_factory
 from .core.logging import bind_request_id, configure_logging, reset_request_id
+from .core.prompt_service import PromptService
 from .core.services_container import ServicesContainer
 from .services.llm_client import LLMHTTPClient
 from .services.llm_service import LLMService
+from .services.product_issue_service import ProductIssueService
 from .services.retrieval_service import RetrievalService
+from .services.session_store import SessionStore
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +30,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    configure_logging(settings.log_format)
+    configure_logging(settings.log_format, level="DEBUG" if settings.debug else "INFO")
     engine = create_engine_from_settings(settings)
     session_factory = create_session_factory(engine)
 
@@ -40,11 +43,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         http_client = LLMHTTPClient(base_url=settings.ollama_base_url)
 
     llm_service = LLMService(settings=settings, http_client=http_client)
+    prompt_service = PromptService()
+
     app.state.container = ServicesContainer(
         settings=settings,
         session_factory=session_factory,
         llm=llm_service,
         retrieval=RetrievalService(session_factory=session_factory, llm=llm_service),
+        prompt_service=prompt_service,
+        product_issue_service=ProductIssueService(session_factory=session_factory),
+        session_store=SessionStore(session_factory=session_factory),
     )
     app.state.runner = AgentRunner(app.state.container)
     try:

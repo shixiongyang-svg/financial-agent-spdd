@@ -12,6 +12,7 @@ SessionFactory = sessionmaker[Session]
 
 
 def create_engine_from_settings(settings: Settings) -> Engine:
+    # TODO check if it supports pure url + username, password, check if there is any risk by embedding credit into db url
     return create_engine(settings.database_url, pool_pre_ping=True)
 
 

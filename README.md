@@ -10,12 +10,16 @@ and operates safely under explicit guardrails.
 ```bash
 # First run: interactive provider/config setup, then start services
 ./start
+
+# Enable debug logging and graph node state snapshots
+./start --debug
 ```
 
 Behavior of `./start`:
 
 - **First run** (no `./.local-config/llm.env`): asks you to choose provider (`ollama` or `openrouter`) and input required values, then saves them to `./.local-config/llm.env`.
 - **Subsequent runs**: no prompts; reuses the saved config automatically.
+- **Debug mode**: pass `--debug` to enable debug-level logs, including graph node enter/exit state snapshots.
 - **Reset config**: delete local config directory and run again:
 
 ```bash
@@ -67,7 +71,7 @@ financial-agent-spdd_week_00/
 | `financial-agent-nginx` | HTTP reverse proxy       | Port 80                                  |
 | `financial-agent-api`   | FastAPI backend          | http://financial-agent-api.localhost.com |
 | `financial-agent-ui`    | Frontend placeholder     | http://financial-agent-ui.localhost.com  |
-| `financial-agent-db`    | PostgreSQL 16 + pgvector | localhost:5432                           |
+| `financial-agent-db`    | PostgreSQL 16 + pgvector | localhost:54321                          |
 
 ## Health Endpoints
 
@@ -111,8 +115,8 @@ uv run uvicorn financial_agent_api.main:app --app-dir src --reload
 
 交互时会根据模型提供商要求不同变量：
 
-- Ollama：`OLLAMA_BASE_URL`、`OLLAMA_CHAT_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM`
-- OpenRouter：`OPENROUTER_API_KEY`、`OPENROUTER_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM`
+- Ollama：`OLLAMA_BASE_URL`、`OLLAMA_CHAT_MODEL`、`OLLAMA_OPS_MODEL`、`COMPRESS_OPS_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM`
+- OpenRouter：`OPENROUTER_API_KEY`、`OPENROUTER_BASE_URL`、`OPENROUTER_MODEL`、`OLLAMA_BASE_URL`、`OLLAMA_CHAT_MODEL`、`COMPRESS_OPS_MODEL`、`EMBEDDING_MODEL`、`EMBEDDING_DIM`
 
 ### OpenRouter 免费模型快速验证脚本
 

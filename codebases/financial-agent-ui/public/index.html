@@ -179,6 +179,26 @@
   <script>
     const API_HEALTHZ_URL = 'http://financial-agent-api.localhost.com/healthz';
     const API_QUERY_URL = 'http://financial-agent-api.localhost.com/agent/query';
+    const SESSION_STORAGE_KEY = 'financial_agent_session_id';
+
+    function loadSessionId() {
+      try {
+        return window.localStorage.getItem(SESSION_STORAGE_KEY) || '';
+      } catch (err) {
+        return '';
+      }
+    }
+
+    function saveSessionId(sessionId) {
+      if (!sessionId) {
+        return;
+      }
+      try {
+        window.localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+      } catch (err) {
+        // Ignore storage failures and keep the session in-memory only.
+      }
+    }
 
     async function checkHealth() {
       const dot = document.getElementById('status-dot');
@@ -217,6 +237,7 @@
       const answerBox = document.getElementById('answer-box');
       const queryMeta = document.getElementById('query-meta');
       const question = questionInput.value.trim();
+      const sessionId = loadSessionId();
 
       if (!question) {
         answerBox.textContent = 'Question cannot be empty.';
@@ -224,28 +245,42 @@
       }
 
       askBtn.disabled = true;
-      queryMeta.textContent = 'Sending request...';
+      queryMeta.textContent = sessionId ? ('session_id: ' + sessionId + ' | Sending request...') : 'Creating session...';
       answerBox.textContent = 'Loading...';
 
       try {
+        const payload = {
+          question,
+        };
+        if (sessionId) {
+          payload.session_id = sessionId;
+        }
+
         const response = await fetch(API_QUERY_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            question,
-            session_id: 'ui-session',
-            conversation_history: [],
-          }),
+          body: JSON.stringify(payload),
         });
 
         const data = await response.json();
         const reqId = data.request_id || response.headers.get('X-Request-Id') || '-';
-        queryMeta.textContent = 'request_id: ' + reqId + ' | status: ' + response.status;
+        if (data.session_id) {
+          saveSessionId(data.session_id);
+        }
+        const currentSessionId = data.session_id || sessionId || '-';
+        queryMeta.textContent =
+          'session_id: ' + currentSessionId + ' | request_id: ' + reqId + ' | status: ' + response.status;
 
         if (!response.ok) {
-          answerBox.textContent = (data && data.message) ? data.message : 'Request failed.';
+          if (data && data.error_code === 'scenario_feedback_required') {
+            answerBox.textContent =
+              'Need more information before I can continue.\n\n' +
+              (data.message || 'Please clarify the product and issue.');
+          } else {
+            answerBox.textContent = (data && data.message) ? data.message : 'Request failed.';
+          }
           return;
         }
 

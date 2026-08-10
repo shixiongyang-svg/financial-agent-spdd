@@ -46,3 +46,18 @@ class LLMOutputValidationError(Exception):
             f"LLMOutputValidationError(message={self.message!r}, request_id={self.request_id}, "
             f"payload={_safe_payload(self.payload)!r})"
         )
+
+
+class ScenarioFeedbackRequired(Exception):
+    def __init__(self, message: str, request_id: str | None, reason: str, session_id: str | None = None) -> None:
+        self.message = message
+        self.request_id = request_id
+        self.reason = reason
+        self.session_id = session_id
+        super().__init__(str(self))
+
+    def __str__(self) -> str:
+        return (
+            f"ScenarioFeedbackRequired(message={self.message!r}, request_id={self.request_id}, "
+            f"reason={self.reason!r}, session_id={self.session_id!r})"
+        )
