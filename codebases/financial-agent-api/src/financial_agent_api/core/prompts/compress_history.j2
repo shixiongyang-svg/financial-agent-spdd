@@ -1,0 +1,18 @@
+Instruction:
+Summarize the MESSAGES_TO_COMPRESS into a concise factual summary suitable for later reasoning.
+Do NOT add new facts. Preserve terminology and language exactly.
+Return EXACTLY one JSON object:
+
+- summary_text: concise summary string
+- confidence: number 0..1
+
+Messages to compress:
+{% for m in messages_to_compress -%}
+- {{ m.role }}: {{ m.content }}
+{% endfor %}
+
+Answer (ONLY JSON, no markdown, no code blocks):
+{
+"summary_text": {{ summary_text | default("") | tojson }},
+"confidence": {{ confidence | default(0.0) }}
+}

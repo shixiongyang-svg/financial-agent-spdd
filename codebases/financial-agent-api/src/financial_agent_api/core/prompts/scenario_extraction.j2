@@ -1,0 +1,24 @@
+Instruction:
+You are given a conversation and an allowed product→issues map.
+Return EXACTLY one JSON object with keys:
+
+- product_type: string or null
+- issue_type: string or null
+- confidence: number between 0 and 1
+
+Messages:
+{% for m in messages -%}
+- {{ m.role }}: {{ m.content }}
+{% endfor %}
+
+Allowed values:
+{% for p, issues in allowed_product_issue_map.items() -%}
+- {{ p }}: {{ issues }}
+{% endfor %}
+
+Answer (ONLY JSON, no markdown, no code blocks):
+{
+"product_type": {{ product_type | default(None) | tojson }},
+"issue_type": {{ issue_type | default(None) | tojson }},
+"confidence": {{ confidence | default(0.0) }}
+}

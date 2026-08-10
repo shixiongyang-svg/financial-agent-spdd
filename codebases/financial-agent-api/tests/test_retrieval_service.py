@@ -97,6 +97,8 @@ async def test_retrieve_complaints_projects_rows_to_complaint_row() -> None:
     assert session.last_params == {
         "query_pattern": "%fees%",
         "product_pattern": "%credit%",
+        "issue_pattern": "%",
         "product_filter_enabled": True,
+        "issue_filter_enabled": False,
         "limit": 10,
     }

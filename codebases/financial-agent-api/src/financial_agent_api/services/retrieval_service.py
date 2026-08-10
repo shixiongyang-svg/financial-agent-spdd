@@ -64,6 +64,7 @@ class RetrievalService:
         *,
         limit: int = 10,
         product: str | None = None,
+        issue: str | None = None,
         request_id: str | None = None,
     ) -> list[ComplaintRow]:
         if limit <= 0:
@@ -76,13 +77,17 @@ class RetrievalService:
                 "query": query,
                 "limit": limit,
                 "product": product,
+                "issue": issue,
             },
         )
         product_pattern = f"%{product}%" if product else "%"
+        issue_pattern = f"%{issue}%" if issue else "%"
         params: dict[str, str | int | bool] = {
             "query_pattern": f"%{query}%",
             "product_pattern": product_pattern,
+            "issue_pattern": issue_pattern,
             "product_filter_enabled": bool(product),
+            "issue_filter_enabled": bool(issue),
             "limit": limit,
         }
         sql = text(
@@ -98,6 +103,7 @@ class RetrievalService:
               narrative
             FROM complaints
             WHERE (:product_filter_enabled = FALSE OR product ILIKE :product_pattern)
+              AND (:issue_filter_enabled = FALSE OR issue ILIKE :issue_pattern)
               AND (
                 issue ILIKE :query_pattern
                 OR company ILIKE :query_pattern

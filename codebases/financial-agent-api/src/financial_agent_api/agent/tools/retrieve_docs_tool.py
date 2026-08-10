@@ -11,12 +11,8 @@ async def retrieve_docs_tool(
     retrieval: RetrievalService,
 ) -> dict:
     """Retrieve document chunks relevant to the user query. Returns partial AgentState dict."""
-    try:
-        docs = await retrieval.retrieve_docs(
-            state["user_query"],
-            request_id=state["request_id"],
-        )
-        return {"retrieved_docs": docs}
-    except Exception as exc:
-        logger.warning("retrieve_docs_tool failed", extra={"error": str(exc), "request_id": state["request_id"]})
-        return {"retrieved_docs": [], "error": str(exc)}
+    docs = await retrieval.retrieve_docs(
+        state["user_query"],
+        request_id=state["request_id"],
+    )
+    return {"retrieved_docs": docs}
