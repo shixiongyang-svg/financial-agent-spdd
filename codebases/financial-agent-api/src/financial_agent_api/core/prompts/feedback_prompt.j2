@@ -1,7 +1,3 @@
-Generate a friendly, specific clarification prompt asking the user for missing information.
-
-List the missing fields and, when allowed_values provided, offer quick-choice suggestions.
-
 User query:
 {{ user_query }}
 
@@ -9,5 +5,12 @@ Missing fields: {{ missing_fields }}
 
 Allowed values (optional):
 {{ allowed_values }}
+
+Generate a friendly, specific clarification prompt asking the user for missing information.
+
+Instruction:
+- List the missing fields.
+- When allowed_values are provided, offer quick-choice suggestions.
+- Keep the tone friendly, specific, and concise.
 
 Clarifying prompt to user:
